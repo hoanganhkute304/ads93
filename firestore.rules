@@ -1,0 +1,71 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidLink(data) {
+      return data.title is string && data.title.size() <= 200
+        && data.slug is string && data.slug.size() <= 100 && data.slug.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.destinationUrl is string && data.destinationUrl.size() <= 2048
+        && data.isActive is bool
+        && data.totalClicks is number && data.totalClicks >= 0
+        && data.uniqueClicks is number && data.uniqueClicks >= 0;
+    }
+
+    function isValidImage(data) {
+      return data.title is string && data.title.size() <= 200
+        && data.slug is string && data.slug.size() <= 100 && data.slug.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.imageUrl is string && data.imageUrl.size() <= 5000
+        && data.isActive is bool
+        && data.viewsCount is number && data.viewsCount >= 0
+        && (!('aspectRatio' in data) || (data.aspectRatio is string && data.aspectRatio.size() <= 20));
+    }
+
+    function isValidClickLog(data) {
+      return data.linkSlug is string && data.linkSlug.size() <= 100
+        && data.timestamp is string && data.timestamp.size() <= 50
+        && data.source is string && data.source.size() <= 100
+        && data.device is string && data.device.size() <= 50
+        && data.isUnique is bool;
+    }
+
+    // Links collection
+    match /links/{linkId} {
+      allow read: if true;
+      allow create: if isValidId(linkId) && isValidLink(incoming());
+      allow update: if isValidId(linkId) && isValidLink(incoming());
+      allow delete: if true;
+    }
+
+    // Images collection
+    match /images/{imageId} {
+      allow read: if true;
+      allow create: if isValidId(imageId) && isValidImage(incoming());
+      allow update: if isValidId(imageId) && isValidImage(incoming());
+      allow delete: if true;
+    }
+
+    // Click logs stream (append-only)
+    match /click_logs/{logId} {
+      allow read: if true;
+      allow create: if isValidId(logId) && isValidClickLog(incoming());
+      allow update, delete: if false;
+    }
+  }
+}

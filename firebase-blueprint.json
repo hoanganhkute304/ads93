@@ -1,0 +1,81 @@
+{
+  "entities": {
+    "Link": {
+      "title": "Link",
+      "description": "Shortened redirect link document for marketing campaigns",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 200, "description": "Campaign title" },
+        "slug": { "type": "string", "maxLength": 100, "pattern": "^[a-zA-Z0-9_-]+$", "description": "Unique URL slug identifier" },
+        "destinationUrl": { "type": "string", "maxLength": 2048, "description": "Target destination URL" },
+        "createdAt": { "type": "string", "description": "Creation timestamp ISO string" },
+        "updatedAt": { "type": "string", "description": "Last updated timestamp ISO string" },
+        "isActive": { "type": "boolean", "description": "Whether link redirection is enabled" },
+        "tags": { "type": "array", "description": "Category tags for link" },
+        "totalClicks": { "type": "number", "description": "Total redirection clicks count" },
+        "uniqueClicks": { "type": "number", "description": "Count of unique visitors" },
+        "lastClickedAt": { "type": "string", "description": "Timestamp of most recent click" },
+        "notes": { "type": "string", "maxLength": 1000, "description": "Internal notes" }
+      },
+      "required": ["title", "slug", "destinationUrl", "isActive", "totalClicks", "uniqueClicks"]
+    },
+    "ImageBanner": {
+      "title": "ImageBanner",
+      "description": "Banner image metadata and direct serving reference",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 200, "description": "Banner title" },
+        "slug": { "type": "string", "maxLength": 100, "pattern": "^[a-zA-Z0-9_-]+$", "description": "Direct image slug identifier" },
+        "imageUrl": { "type": "string", "maxLength": 5000, "description": "Image source URL, CDN path, or local upload path" },
+        "contentType": { "type": "string", "maxLength": 50, "description": "MIME type" },
+        "dimensions": { "type": "string", "maxLength": 50, "description": "Image pixel dimensions" },
+        "aspectRatio": { "type": "string", "maxLength": 20, "description": "Banner display aspect ratio e.g. 2.4:1, 16:9, 1:1, 9:16" },
+        "fileSize": { "type": "string", "maxLength": 50, "description": "Human readable file size" },
+        "createdAt": { "type": "string", "description": "Creation ISO timestamp" },
+        "updatedAt": { "type": "string", "description": "Update ISO timestamp" },
+        "viewsCount": { "type": "number", "description": "Direct image view impressions" },
+        "isActive": { "type": "boolean", "description": "Active display status" },
+        "targetLinkSlug": { "type": "string", "maxLength": 100, "description": "Associated short link slug" },
+        "notes": { "type": "string", "maxLength": 1000, "description": "Internal notes" }
+      },
+      "required": ["title", "slug", "imageUrl", "isActive", "viewsCount"]
+    },
+    "ClickLog": {
+      "title": "ClickLog",
+      "description": "Realtime click event audit log",
+      "type": "object",
+      "properties": {
+        "linkId": { "type": "string", "maxLength": 128, "description": "ID of parent link" },
+        "linkSlug": { "type": "string", "maxLength": 100, "description": "Slug of clicked link" },
+        "targetUrl": { "type": "string", "maxLength": 2048, "description": "Final target destination" },
+        "timestamp": { "type": "string", "description": "Click event timestamp ISO string" },
+        "source": { "type": "string", "maxLength": 100, "description": "Traffic source e.g. TikTok, Facebook, Zalo, Google" },
+        "utmSource": { "type": "string", "maxLength": 100, "description": "UTM source tag" },
+        "utmMedium": { "type": "string", "maxLength": 100, "description": "UTM medium tag" },
+        "utmCampaign": { "type": "string", "maxLength": 100, "description": "UTM campaign tag" },
+        "referrer": { "type": "string", "maxLength": 2048, "description": "HTTP Referer URL" },
+        "userAgent": { "type": "string", "maxLength": 1000, "description": "User Agent string" },
+        "device": { "type": "string", "maxLength": 50, "description": "Mobile, Desktop, or Tablet" },
+        "browser": { "type": "string", "maxLength": 100, "description": "Browser name" },
+        "os": { "type": "string", "maxLength": 100, "description": "Operating system" },
+        "ip": { "type": "string", "maxLength": 100, "description": "Anonymized IP address" },
+        "isUnique": { "type": "boolean", "description": "Whether this visitor was unique" }
+      },
+      "required": ["linkSlug", "timestamp", "source", "device", "isUnique"]
+    }
+  },
+  "firestore": {
+    "/links/{linkId}": {
+      "schema": "Link",
+      "description": "Collection of shortened redirect links"
+    },
+    "/images/{imageId}": {
+      "schema": "ImageBanner",
+      "description": "Collection of direct served banners"
+    },
+    "/click_logs/{logId}": {
+      "schema": "ClickLog",
+      "description": "Collection of click events for analytics"
+    }
+  }
+}

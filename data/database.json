@@ -1,0 +1,41 @@
+{
+  "links": [
+    {
+      "id": "link_1",
+      "title": "Kênh TikTok Neon 9393",
+      "slug": "link1",
+      "destinationUrl": "https://www.tiktok.com/@neon_9393",
+      "createdAt": "2026-10-18T00:00:00.000Z",
+      "updatedAt": "2026-10-18T00:00:00.000Z",
+      "isActive": true,
+      "tags": [
+        "tiktok",
+        "kol"
+      ],
+      "totalClicks": 0,
+      "uniqueClicks": 0,
+      "notes": "Đường dẫn chuyển hướng chính"
+    }
+  ],
+  "images": [
+    {
+      "id": "img_1792434346959_55co",
+      "title": "103776512_p0-Photoroom",
+      "slug": "1233",
+      "imageUrl": "/uploads/103776512_p0-Photoroom_1792434345528.png",
+      "contentType": "image/png",
+      "dimensions": "1200x630",
+      "fileSize": "Tự động",
+      "createdAt": "2026-10-19T18:25:46.958Z",
+      "updatedAt": "2026-10-19T18:25:46.958Z",
+      "viewsCount": 0,
+      "isActive": true,
+      "targetLinkSlug": "",
+      "notes": ""
+    }
+  ],
+  "logs": [],
+  "ipSeen": {
+    "link_1": []
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "ADS93 - Quản Lý Link & Banner Quảng Cáo Tối Giản",
+  "description": "Nền tảng rút gọn link quảng cáo, chuyển hướng siêu tốc, lưu trữ banner trực tiếp, đo lường lượt click theo nguồn thời gian thực và xuất báo cáo Excel/PDF.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
