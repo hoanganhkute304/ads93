@@ -6,27 +6,21 @@ import {
   getDocFromServer,
   collection,
   query,
-  orderBy,
-  limit,
   onSnapshot,
   setDoc,
   updateDoc,
   deleteDoc,
-  addDoc,
-  serverTimestamp,
   getDocs,
   where,
   increment
 } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
-import { LinkItem, ImageBannerItem, ClickLog } from './types';
+import { LinkItem, ImageBannerItem, ClickLog, BannerFitMode } from './types';
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId); /* CRITICAL: The app will break without this line */
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 
-// Error handling conforming to Skill requirements
 export enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',
@@ -36,57 +30,29 @@ export enum OperationType {
   WRITE = 'write',
 }
 
-export interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId?: string | null;
-    email?: string | null;
-    emailVerified?: boolean | null;
-    isAnonymous?: boolean | null;
-  };
-}
-
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {
-  const errInfo: FirestoreErrorInfo = {
+  const errInfo = {
     error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid || null,
-      email: auth.currentUser?.email || null,
-      emailVerified: auth.currentUser?.emailVerified || null,
-      isAnonymous: auth.currentUser?.isAnonymous || null,
-    },
     operationType,
     path
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  console.error('Firestore Error:', errInfo);
+  throw new Error(errInfo.error);
 }
 
-// Validate connection on startup
 export async function testConnection(): Promise<boolean> {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
-    console.log('Firebase connection confirmed.');
     return true;
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error('Please check your Firebase configuration.');
-    }
-    // Expected to succeed or reject gracefully
+  } catch {
     return false;
   }
 }
 
-testConnection();
-
-// Collection names
 const LINKS_COLL = 'links';
 const IMAGES_COLL = 'images';
 const LOGS_COLL = 'click_logs';
 
-// --- REAL-TIME LISTENERS ---
 export function subscribeLinks(onUpdate: (links: LinkItem[]) => void, onError?: (err: any) => void) {
   const q = query(collection(db, LINKS_COLL));
   return onSnapshot(
@@ -110,12 +76,10 @@ export function subscribeLinks(onUpdate: (links: LinkItem[]) => void, onError?: 
           notes: data.notes || ''
         });
       });
-      // Sort newest first
       links.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       onUpdate(links);
     },
     error => {
-      handleFirestoreError(error, OperationType.LIST, LINKS_COLL);
       onError?.(error);
     }
   );
@@ -134,9 +98,12 @@ export function subscribeBanners(onUpdate: (banners: ImageBannerItem[]) => void,
           title: data.title || '',
           slug: data.slug || '',
           imageUrl: data.imageUrl || '',
+          originalImageUrl: data.originalImageUrl || data.imageUrl || '',
           contentType: data.contentType || 'image/png',
           dimensions: data.dimensions,
-          aspectRatio: data.aspectRatio || '2.4:1',
+          aspectRatio: data.aspectRatio || '16:9',
+          fitMode: (data.fitMode as BannerFitMode) || 'fit',
+          bgColor: data.bgColor || '#ffffff',
           fileSize: data.fileSize,
           createdAt: data.createdAt || new Date().toISOString(),
           updatedAt: data.updatedAt || new Date().toISOString(),
@@ -150,7 +117,6 @@ export function subscribeBanners(onUpdate: (banners: ImageBannerItem[]) => void,
       onUpdate(banners);
     },
     error => {
-      handleFirestoreError(error, OperationType.LIST, IMAGES_COLL);
       onError?.(error);
     }
   );
@@ -183,18 +149,15 @@ export function subscribeClickLogs(onUpdate: (logs: ClickLog[]) => void, onError
           isUnique: data.isUnique !== false
         });
       });
-      // Sort newest first
       logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       onUpdate(logs);
     },
     error => {
-      handleFirestoreError(error, OperationType.LIST, LOGS_COLL);
       onError?.(error);
     }
   );
 }
 
-// --- CRUD OPERATIONS ---
 export async function addLinkToFirestore(payload: {
   title: string;
   slug: string;
@@ -205,9 +168,8 @@ export async function addLinkToFirestore(payload: {
   const cleanSlug = payload.slug.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
   const now = new Date().toISOString();
   const id = `link_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-
   const newDoc = {
-    title: payload.title.trim() || `Link ${cleanSlug}`,
+    title: payload.title.trim() || cleanSlug,
     slug: cleanSlug,
     destinationUrl: payload.destinationUrl.trim(),
     createdAt: now,
@@ -218,45 +180,28 @@ export async function addLinkToFirestore(payload: {
     uniqueClicks: 0,
     notes: payload.notes || ''
   };
-
-  try {
-    await setDoc(doc(db, LINKS_COLL, id), newDoc);
-    return { id, ...newDoc };
-  } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, `${LINKS_COLL}/${id}`);
-  }
+  await setDoc(doc(db, LINKS_COLL, id), newDoc);
+  return { id, ...newDoc };
 }
 
 export async function updateLinkInFirestore(id: string, updates: Partial<LinkItem>): Promise<void> {
-  const path = `${LINKS_COLL}/${id}`;
-  try {
-    await updateDoc(doc(db, LINKS_COLL, id), {
-      ...updates,
-      updatedAt: new Date().toISOString()
-    });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
-  }
+  await updateDoc(doc(db, LINKS_COLL, id), {
+    ...updates,
+    updatedAt: new Date().toISOString()
+  });
 }
 
 export async function deleteLinkFromFirestore(id: string, slug?: string): Promise<void> {
-  const path = `${LINKS_COLL}/${id}`;
   try {
     await deleteDoc(doc(db, LINKS_COLL, id));
-  } catch (error) {
-    console.warn(`Direct deleteDoc for link ${id} failed, trying query:`, error);
-  }
-
+  } catch {}
   if (slug) {
     try {
       const clean = slug.trim().toLowerCase();
       const q = query(collection(db, LINKS_COLL), where('slug', '==', clean));
       const snap = await getDocs(q);
-      const batchDeletes = snap.docs.map(d => deleteDoc(d.ref));
-      await Promise.all(batchDeletes);
-    } catch (err) {
-      console.warn(`Delete link by slug ${slug} failed:`, err);
-    }
+      await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
+    } catch {}
   }
 }
 
@@ -264,8 +209,11 @@ export async function addBannerToFirestore(payload: {
   title: string;
   slug: string;
   imageUrl: string;
+  originalImageUrl?: string;
   dimensions?: string;
   aspectRatio?: string;
+  fitMode?: BannerFitMode;
+  bgColor?: string;
   fileSize?: string;
   targetLinkSlug?: string;
   notes?: string;
@@ -273,15 +221,17 @@ export async function addBannerToFirestore(payload: {
   const cleanSlug = payload.slug.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
   const now = new Date().toISOString();
   const id = `img_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-
   const newDoc = {
-    title: payload.title.trim() || `Banner ${cleanSlug}`,
+    title: payload.title.trim() || cleanSlug,
     slug: cleanSlug,
     imageUrl: payload.imageUrl.trim(),
-    contentType: payload.imageUrl.endsWith('.png') ? 'image/png' : (payload.imageUrl.endsWith('.webp') ? 'image/webp' : 'image/jpeg'),
-    dimensions: payload.dimensions || '1200x630',
-    aspectRatio: payload.aspectRatio || '2.4:1',
-    fileSize: payload.fileSize || 'Tự động',
+    originalImageUrl: (payload.originalImageUrl || payload.imageUrl).trim(),
+    contentType: 'image/png',
+    dimensions: payload.dimensions || '1600x900',
+    aspectRatio: payload.aspectRatio || '16:9',
+    fitMode: payload.fitMode || 'fit',
+    bgColor: payload.bgColor || '#ffffff',
+    fileSize: payload.fileSize || 'Auto',
     createdAt: now,
     updatedAt: now,
     viewsCount: 0,
@@ -290,67 +240,40 @@ export async function addBannerToFirestore(payload: {
     notes: payload.notes || ''
   };
 
-  if (newDoc.imageUrl.length > 5000) {
-    throw new Error('Đường dẫn ảnh quá lớn (>5KB). Tệp ảnh đã tải cần được chuyển qua hệ thống lưu trữ máy chủ /uploads thay vì lưu trực tiếp base64 vào Firestore.');
-  }
-
-  try {
-    await setDoc(doc(db, IMAGES_COLL, id), newDoc);
-    return { id, ...newDoc };
-  } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, `${IMAGES_COLL}/${id}`);
-  }
+  await setDoc(doc(db, IMAGES_COLL, id), newDoc);
+  return { id, ...newDoc };
 }
 
 export async function updateBannerInFirestore(id: string, updates: Partial<ImageBannerItem>): Promise<void> {
-  const path = `${IMAGES_COLL}/${id}`;
-  try {
-    await updateDoc(doc(db, IMAGES_COLL, id), {
-      ...updates,
-      updatedAt: new Date().toISOString()
-    });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
-  }
+  await updateDoc(doc(db, IMAGES_COLL, id), {
+    ...updates,
+    updatedAt: new Date().toISOString()
+  });
 }
 
 export async function deleteBannerFromFirestore(id: string, slug?: string): Promise<void> {
-  const path = `${IMAGES_COLL}/${id}`;
   try {
     await deleteDoc(doc(db, IMAGES_COLL, id));
-  } catch (error) {
-    console.warn(`Direct deleteDoc for image ${id} failed, trying query:`, error);
-  }
-
+  } catch {}
   if (slug) {
     try {
       const clean = slug.trim().toLowerCase();
       const q = query(collection(db, IMAGES_COLL), where('slug', '==', clean));
       const snap = await getDocs(q);
-      const batchDeletes = snap.docs.map(d => deleteDoc(d.ref));
-      await Promise.all(batchDeletes);
-    } catch (err) {
-      console.warn(`Delete image by slug ${slug} failed:`, err);
-    }
+      await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
+    } catch {}
   }
 }
 
 export async function logClickToFirestore(log: Omit<ClickLog, 'id'>): Promise<void> {
   const id = `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-  try {
-    await setDoc(doc(db, LOGS_COLL, id), log);
-    // Also increment link counters if linkId exists
-    if (log.linkId) {
-      const linkRef = doc(db, LINKS_COLL, log.linkId);
-      await updateDoc(linkRef, {
-        totalClicks: increment(1),
-        ...(log.isUnique ? { uniqueClicks: increment(1) } : {}),
-        lastClickedAt: log.timestamp
-      }).catch(() => {
-        // Safe catch if link not found by id
-      });
-    }
-  } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, `${LOGS_COLL}/${id}`);
+  await setDoc(doc(db, LOGS_COLL, id), log);
+  if (log.linkId) {
+    const linkRef = doc(db, LINKS_COLL, log.linkId);
+    await updateDoc(linkRef, {
+      totalClicks: increment(1),
+      ...(log.isUnique ? { uniqueClicks: increment(1) } : {}),
+      lastClickedAt: log.timestamp
+    }).catch(() => {});
   }
 }

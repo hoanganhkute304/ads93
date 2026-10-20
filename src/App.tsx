@@ -14,18 +14,14 @@ import {
   Upload, 
   Search, 
   CheckCircle2, 
-  Sparkles, 
-  Film, 
   RotateCw, 
-  SlidersHorizontal,
   Maximize2,
   X,
   Edit2,
-  Eye,
-  CheckCheck
+  Palette
 } from 'lucide-react';
 import { api } from './services/api';
-import { LinkItem, ImageBannerItem, AnalyticsData, ClickLog, SourceStat, HourlyStat } from './types';
+import { LinkItem, ImageBannerItem, AnalyticsData, ClickLog, SourceStat, HourlyStat, BannerFitMode } from './types';
 import { QRCodeModal } from './components/QRCodeModal';
 import { exportToExcel, exportToPdf } from './utils/exportReport';
 import { 
@@ -44,39 +40,46 @@ import {
 export interface AspectRatioOption {
   id: string;
   label: string;
-  category: string;
   ratio: string;
-  desc: string;
-  badge: string;
 }
 
 export const ASPECT_RATIOS: AspectRatioOption[] = [
-  // --- NHÓM ĐIỆN ẢNH & SIÊU RỘNG ---
-  { id: '2.4:1', label: '🎬 Điện ảnh 2.4:1', category: 'Điện ảnh', ratio: '2.4 / 1', desc: 'Chuẩn CinemaScope rạp chiếu phim (2.39:1 / 2.40:1)', badge: 'Cinema 2.4:1' },
-  { id: '2.35:1', label: '🎬 Điện ảnh Cổ Điển 2.35:1', category: 'Điện ảnh', ratio: '2.35 / 1', desc: 'Chuẩn Anamorphic phim kinh điển', badge: 'Cinema 2.35:1' },
-  { id: '2.76:1', label: '🎞️ Siêu Điện ảnh 2.76:1', category: 'Điện ảnh', ratio: '2.76 / 1', desc: 'Ultra-Panavision 70mm đại cảnh siêu rộng', badge: 'Ultra 2.76:1' },
-  { id: '21:9', label: '🖥️ Màn Siêu Rộng 21:9', category: 'Điện ảnh', ratio: '21 / 9', desc: 'Màn hình Ultrawide gaming & rạp gia đình', badge: 'Ultrawide 21:9' },
-  { id: '2:1', label: '📺 Univisium 2:1 (18:9)', category: 'Điện ảnh', ratio: '2 / 1', desc: 'Chuẩn phim Netflix Originals & series truyền hình', badge: 'Univisium 2:1' },
+  { id: '16:9', label: '16:9', ratio: '16 / 9' },
+  { id: '1:1', label: '1:1', ratio: '1 / 1' },
+  { id: '9:16', label: '9:16', ratio: '9 / 16' },
+  { id: '4:3', label: '4:3', ratio: '4 / 3' },
+  { id: '4:5', label: '4:5', ratio: '4 / 5' },
+  { id: '21:9', label: '21:9', ratio: '21 / 9' },
+  { id: '2.4:1', label: '2.4:1', ratio: '2.4 / 1' },
+  { id: '2.35:1', label: '2.35:1', ratio: '2.35 / 1' },
+  { id: '2:1', label: '2:1', ratio: '2 / 1' },
+  { id: '1.91:1', label: '1.91:1', ratio: '1.91 / 1' },
+  { id: '3:1', label: '3:1', ratio: '3 / 1' },
+  { id: '4:1', label: '4:1', ratio: '4 / 1' },
+  { id: '3:2', label: '3:2', ratio: '3 / 2' },
+  { id: '1:2', label: '1:2', ratio: '1 / 2' },
+  { id: 'auto', label: 'Gốc (Auto)', ratio: 'auto' },
+];
 
-  // --- NHÓM MÀN RỘNG TIÊU CHUẨN & ADS ---
-  { id: '16:9', label: '🖥️ Màn ảnh rộng 16:9', category: 'Tiêu chuẩn', ratio: '16 / 9', desc: 'Chuẩn YouTube, Full HD, TV, Laptop & Web Banner', badge: 'Widescreen 16:9' },
-  { id: '1.91:1', label: '📢 Facebook Ads 1.91:1', category: 'Quảng cáo', ratio: '1.91 / 1', desc: 'Chuẩn quảng cáo liên kết Facebook & Google GDN', badge: 'Facebook 1.91:1' },
-  { id: '3:1', label: '🏷️ Banner Header 3:1', category: 'Banner Web', ratio: '3 / 1', desc: 'Banner đầu trang website, cover Facebook fanpage', badge: 'Header 3:1' },
-  { id: '4:1', label: '🏷️ Siêu Banner Ngang 4:1', category: 'Banner Web', ratio: '4 / 1', desc: 'Leaderboard dài ngang trên cùng website (1200x300)', badge: 'Leaderboard 4:1' },
-  { id: '5:1', label: '🏷️ Dải Ruy Băng 5:1', category: 'Banner Web', ratio: '5 / 1', desc: 'Super Ribbon dải thông báo trên cùng hoặc chân trang', badge: 'Ribbon 5:1' },
-  { id: '3:2', label: '📷 Máy ảnh DSLR 3:2', category: 'Tiêu chuẩn', ratio: '3 / 2', desc: 'Chuẩn nhiếp ảnh máy cơ & báo điện tử', badge: 'Photo 3:2' },
-  { id: '4:3', label: '📰 Truyền thống 4:3', category: 'Tiêu chuẩn', ratio: '4 / 3', desc: 'Chuẩn TV xưa, màn hình iPad & GDN Box Banner', badge: 'Standard 4:3' },
+const QUICK_RATIOS = ['16:9', '1:1', '9:16', '4:3', '21:9', '3:1'];
 
-  // --- NHÓM VUÔNG & MẠNG XÃ HỘI ---
-  { id: '1:1', label: '🟦 Khổ Vuông 1:1', category: 'Mạng xã hội', ratio: '1 / 1', desc: 'Instagram Post, Shopee, Lazada, TikTok Shop Feed', badge: 'Square 1:1' },
-  { id: '4:5', label: '📱 Chân dung Dọc 4:5', category: 'Mạng xã hội', ratio: '4 / 5', desc: 'Instagram Portrait Feed tối ưu chiếm trọn màn hình', badge: 'Portrait 4:5' },
+const PRESET_COLORS = [
+  '#ffffff',
+  '#f8fafc',
+  '#f1f5f9',
+  '#000000',
+  '#0f172a',
+  '#fef3c7',
+  '#dcfce7',
+  '#dbeafe',
+  '#fce7f3',
+  '#ede9fe',
+];
 
-  // --- NHÓM KHỔ DỌC TIKTOK / REELS / SHORTS ---
-  { id: '9:16', label: '📱 Khổ Dọc Chuẩn 9:16', category: 'Khổ Dọc', ratio: '9 / 16', desc: 'TikTok Ads, FB/IG Reels, YouTube Shorts, Story', badge: 'TikTok 9:16' },
-  { id: '9:21', label: '📱 Dọc Siêu Dài 9:21', category: 'Khổ Dọc', ratio: '9 / 21', desc: 'Màn hình điện thoại tràn viền dọc', badge: 'Mobile 9:21' },
-  { id: '1:2', label: '🔲 Cột Dọc Skyscraper 1:2', category: 'Banner Dọc', ratio: '1 / 2', desc: 'Half-Page Ad (300x600) cạnh sườn website', badge: 'Skyscraper 1:2' },
-  { id: '1:3', label: '🔲 Banner Tháp 1:3', category: 'Banner Dọc', ratio: '1 / 3', desc: 'Wide Skyscraper (160x600) thanh dọc trang', badge: 'Tower 1:3' },
-  { id: 'auto', label: '🎛️ Tỉ lệ gốc (Auto)', category: 'Tự do', ratio: 'auto', desc: 'Hiển thị kích thước nguyên bản của tệp ảnh', badge: 'Auto' },
+const FIT_MODES: { id: BannerFitMode; label: string }[] = [
+  { id: 'fit', label: 'Fit' },
+  { id: 'fill', label: 'Fill' },
+  { id: 'stretch', label: 'Stretch' },
 ];
 
 export default function App() {
@@ -87,54 +90,47 @@ export default function App() {
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
 
-  // Quick edit state for destination URL
   const [editingDest, setEditingDest] = useState<Record<string, string>>({});
   const [savingDestId, setSavingDestId] = useState<string | null>(null);
 
-  // Aspect ratio state for each banner card
   const [cardRatios, setCardRatios] = useState<Record<string, string>>({});
-  // Object fit mode for banners: 'contain' vs 'cover'
-  const [cardFitModes, setCardFitModes] = useState<Record<string, 'contain' | 'cover'>>({});
+  const [cardFitModes, setCardFitModes] = useState<Record<string, BannerFitMode>>({});
+  const [cardBgColors, setCardBgColors] = useState<Record<string, string>>({});
+  const [openColorPickerId, setOpenColorPickerId] = useState<string | null>(null);
 
-  // Image load error state to display friendly retry
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
-  // Image loaded state for smooth shimmer reveal
   const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({});
+  const [processingBannerId, setProcessingBannerId] = useState<string | null>(null);
 
-  // Inline edit state for banner image URL
   const [editingBannerImgId, setEditingBannerImgId] = useState<string | null>(null);
   const [tempBannerImgUrl, setTempBannerImgUrl] = useState<string>('');
   const [isSavingBannerImg, setIsSavingBannerImg] = useState<boolean>(false);
 
-  // Cinema Lightbox Modal for banner review
   const [cinemaReviewBanner, setCinemaReviewBanner] = useState<ImageBannerItem | null>(null);
 
-  // New Link form state
   const [showCreateLink, setShowCreateLink] = useState(false);
   const [newLinkTitle, setNewLinkTitle] = useState('');
   const [newLinkSlug, setNewLinkSlug] = useState('');
   const [newLinkDest, setNewLinkDest] = useState('');
 
-  // New Banner form state
   const [showCreateBanner, setShowCreateBanner] = useState(false);
   const [newBannerTitle, setNewBannerTitle] = useState('');
   const [newBannerSlug, setNewBannerSlug] = useState('');
-  const [newBannerUrl, setNewBannerUrl] = useState('');
-  const [newBannerRatio, setNewBannerRatio] = useState('2.4:1');
+  const [newBannerRawUrl, setNewBannerRawUrl] = useState('');
+  const [newBannerRatio, setNewBannerRatio] = useState('16:9');
+  const [newBannerFitMode, setNewBannerFitMode] = useState<BannerFitMode>('fit');
+  const [newBannerBgColor, setNewBannerBgColor] = useState('#ffffff');
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [bannerCategoryFilter, setBannerCategoryFilter] = useState<string>('Tất cả');
+  const [isCreatingBanner, setIsCreatingBanner] = useState(false);
 
-  // QR Modal
   const [qrData, setQrData] = useState<{ isOpen: boolean; url: string; title: string }>({
     isOpen: false,
     url: '',
     title: ''
   });
 
-  // Search filter
   const [searchQuery, setSearchQuery] = useState('');
 
-  // In-app Delete Confirmation Modal (Bypasses sandboxed window.confirm)
   const [deleteModal, setDeleteModal] = useState<{
     isOpen: boolean;
     type: 'link' | 'banner';
@@ -146,12 +142,10 @@ export default function App() {
 
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ads93';
 
-  // Test Firebase on boot
   useEffect(() => {
     testConnection();
   }, []);
 
-  // Real-time Firestore subscriptions
   useEffect(() => {
     const unsubLinks = subscribeLinks(data => {
       setLinks(data);
@@ -164,12 +158,17 @@ export default function App() {
 
     const unsubBanners = subscribeBanners(data => {
       setBanners(data);
-      // Initialize card ratios from saved banner data or default 2.4:1
       const rMap: Record<string, string> = {};
+      const fMap: Record<string, BannerFitMode> = {};
+      const cMap: Record<string, string> = {};
       data.forEach(b => {
-        rMap[b.id] = b.aspectRatio || '2.4:1';
+        rMap[b.id] = b.aspectRatio || '16:9';
+        fMap[b.id] = b.fitMode || 'fit';
+        cMap[b.id] = b.bgColor || '#ffffff';
       });
       setCardRatios(prev => ({ ...rMap, ...prev }));
+      setCardFitModes(prev => ({ ...fMap, ...prev }));
+      setCardBgColors(prev => ({ ...cMap, ...prev }));
     });
 
     const unsubLogs = subscribeClickLogs(data => {
@@ -183,21 +182,18 @@ export default function App() {
     };
   }, []);
 
-  // Show Toast
   const notify = (msg: string) => {
     setSuccessToast(msg);
-    setTimeout(() => setSuccessToast(null), 3000);
+    setTimeout(() => setSuccessToast(null), 2500);
   };
 
-  // Copy helper
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopiedText(text);
-    notify(`Đã sao chép: ${text}`);
+    notify('Đã sao chép');
     setTimeout(() => setCopiedText(null), 2000);
   };
 
-  // Ensure absolute protocol on any destination URL
   const formatDestinationUrl = (url: string): string => {
     const trimmed = url.trim();
     if (!trimmed) return '';
@@ -207,57 +203,161 @@ export default function App() {
     return trimmed;
   };
 
-  // Save Destination URL immediately
+  const uploadRawFileToServer = async (file: File): Promise<string> => {
+    const reader = new FileReader();
+    const base64Promise = new Promise<string>((resolve, reject) => {
+      reader.onload = ev => resolve(ev.target?.result as string);
+      reader.onerror = reject;
+    });
+    reader.readAsDataURL(file);
+    const base64Data = await base64Promise;
+
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: `raw_${file.name}`, data: base64Data })
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Lỗi tải ảnh');
+    return json.url;
+  };
+
+  // Xử lý cắt/ghép ảnh thực tế bằng HTML5 Canvas và lưu thành file mới trên server
+  const renderTransformedBannerToServer = async (
+    sourceUrl: string,
+    ratioId: string,
+    fitMode: BannerFitMode,
+    bgColor: string,
+    slugName: string
+  ): Promise<{ url: string; dimensions: string }> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+
+      // Nếu là ảnh từ tên miền ngoài, đi qua proxy để tránh lỗi CORS Canvas
+      const loadUrl = (sourceUrl.startsWith('http://') || sourceUrl.startsWith('https://')) && !sourceUrl.startsWith(origin)
+        ? `/api/proxy-image?url=${encodeURIComponent(sourceUrl)}`
+        : sourceUrl;
+
+      img.onload = async () => {
+        try {
+          const srcW = img.naturalWidth || 1200;
+          const srcH = img.naturalHeight || 630;
+
+          let targetW = srcW;
+          let targetH = srcH;
+
+          const ratioObj = ASPECT_RATIOS.find(r => r.id === ratioId);
+          if (ratioObj && ratioObj.ratio !== 'auto') {
+            const parts = ratioObj.ratio.split('/').map(s => parseFloat(s.trim()));
+            if (parts.length === 2 && parts[0] > 0 && parts[1] > 0) {
+              const targetRatio = parts[0] / parts[1];
+              const BASE_SIZE = 1600;
+              if (targetRatio >= 1) {
+                targetW = BASE_SIZE;
+                targetH = Math.round(BASE_SIZE / targetRatio);
+              } else {
+                targetH = BASE_SIZE;
+                targetW = Math.round(BASE_SIZE * targetRatio);
+              }
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = targetW;
+          canvas.height = targetH;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) throw new Error('Canvas context error');
+
+          // Đổ nền màu cho phần trống (dùng trong chế độ Fit)
+          ctx.fillStyle = bgColor || '#ffffff';
+          ctx.fillRect(0, 0, targetW, targetH);
+
+          if (fitMode === 'stretch') {
+            ctx.drawImage(img, 0, 0, targetW, targetH);
+          } else if (fitMode === 'fill') {
+            const scale = Math.max(targetW / srcW, targetH / srcH);
+            const drawW = srcW * scale;
+            const drawH = srcH * scale;
+            const offsetX = (targetW - drawW) / 2;
+            const offsetY = (targetH - drawH) / 2;
+            ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+          } else {
+            const scale = Math.min(targetW / srcW, targetH / srcH);
+            const drawW = srcW * scale;
+            const drawH = srcH * scale;
+            const offsetX = (targetW - drawW) / 2;
+            const offsetY = (targetH - drawH) / 2;
+            ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+          }
+
+          const base64Data = canvas.toDataURL('image/png');
+          const res = await fetch('/api/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              filename: `${slugName || 'banner'}_${ratioId.replace(':', 'x')}_${fitMode}.png`,
+              data: base64Data
+            })
+          });
+          const json = await res.json();
+          if (!json.success) throw new Error(json.error || 'Upload error');
+
+          resolve({
+            url: json.url,
+            dimensions: `${targetW}x${targetH}`
+          });
+        } catch {
+          resolve({ url: sourceUrl, dimensions: '1200x630' });
+        }
+      };
+
+      img.onerror = () => {
+        resolve({ url: sourceUrl, dimensions: '1200x630' });
+      };
+
+      img.src = loadUrl;
+    });
+  };
+
   const handleSaveDestination = async (link: LinkItem) => {
     const rawTarget = (editingDest[link.id] || '').trim();
-    if (!rawTarget) {
-      alert('Vui lòng nhập đường dẫn trang đích hợp lệ');
-      return;
-    }
-
+    if (!rawTarget) return;
     const newTarget = formatDestinationUrl(rawTarget);
 
     try {
       setSavingDestId(link.id);
-      // 1. Update in Firestore
       await updateLinkInFirestore(link.id, { destinationUrl: newTarget });
-      // 2. Update in server backend
       await api.updateLink(link.id, { destinationUrl: newTarget, slug: link.slug }).catch(() => {});
-      
       setEditingDest(prev => ({ ...prev, [link.id]: newTarget }));
-      notify(`Đã đổi trang đích /link/${link.slug} sang: ${newTarget}`);
+      notify('Đã cập nhật link đích');
     } catch (err: any) {
-      notify('Lỗi cập nhật: ' + (err.message || 'Không thể lưu'));
+      notify('Lỗi: ' + (err.message || 'Không thể lưu'));
     } finally {
       setSavingDestId(null);
     }
   };
 
-  // Create new short link
   const handleCreateLink = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanSlug = newLinkSlug.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
-    if (!cleanSlug || !newLinkDest.trim()) {
-      notify('Vui lòng nhập slug và link trang đích');
-      return;
-    }
-
+    if (!cleanSlug || !newLinkDest.trim()) return;
     const cleanDest = formatDestinationUrl(newLinkDest);
 
     try {
       await addLinkToFirestore({
-        title: newLinkTitle.trim() || `Link ${cleanSlug}`,
+        title: newLinkTitle.trim() || cleanSlug,
         slug: cleanSlug,
         destinationUrl: cleanDest,
         tags: []
       });
       await api.createLink({
-        title: newLinkTitle.trim() || `Link ${cleanSlug}`,
+        title: newLinkTitle.trim() || cleanSlug,
         slug: cleanSlug,
         destinationUrl: cleanDest
       }).catch(() => {});
 
-      notify(`Đã tạo link /link/${cleanSlug} thành công!`);
+      notify(`Đã tạo /link/${cleanSlug}`);
       setShowCreateLink(false);
       setNewLinkTitle('');
       setNewLinkSlug('');
@@ -267,184 +367,209 @@ export default function App() {
     }
   };
 
-  // Delete link - opens in-app confirmation modal
-  const handleDeleteLink = (id: string, slug: string, title?: string) => {
-    setDeleteModal({
-      isOpen: true,
-      type: 'link',
-      id,
-      slug,
-      title: title || `/link/${slug}`
-    });
-  };
-
-  // Upload image file
-  const handleUploadBannerFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUploadNewBannerFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     try {
       setIsUploadingImage(true);
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve, reject) => {
-        reader.onload = ev => resolve(ev.target?.result as string);
-        reader.onerror = reject;
-      });
-      reader.readAsDataURL(file);
-      const base64Data = await base64Promise;
-
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: file.name, data: base64Data })
-      });
-      const json = await res.json();
-      if (!json.success) throw new Error(json.error || 'Lỗi lưu ảnh');
-
-      setNewBannerUrl(json.url);
+      const uploadedRawUrl = await uploadRawFileToServer(file);
+      setNewBannerRawUrl(uploadedRawUrl);
       if (!newBannerTitle) setNewBannerTitle(file.name.replace(/\.[^/.]+$/, ''));
       if (!newBannerSlug) setNewBannerSlug(file.name.replace(/\.[^/.]+$/, '').toLowerCase().replace(/[^a-z0-9_-]/g, '-'));
-      notify('Tải ảnh lên máy chủ thành công!');
+      notify('Đã tải ảnh lên');
     } catch (err: any) {
-      notify('Lỗi tải ảnh: ' + (err.message || 'Không thể tải'));
+      notify('Lỗi: ' + (err.message || 'Không thể tải ảnh'));
     } finally {
       setIsUploadingImage(false);
+      e.target.value = '';
     }
   };
 
-  // Create new banner
   const handleCreateBanner = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanSlug = newBannerSlug.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
-    if (!cleanSlug || !newBannerUrl.trim()) {
-      notify('Vui lòng nhập mã ảnh slug và chọn ảnh');
-      return;
-    }
+    if (!cleanSlug || !newBannerRawUrl.trim()) return;
 
     try {
+      setIsCreatingBanner(true);
+      const rawUrl = newBannerRawUrl.trim();
+
+      const rendered = await renderTransformedBannerToServer(
+        rawUrl,
+        newBannerRatio,
+        newBannerFitMode,
+        newBannerBgColor,
+        cleanSlug
+      );
+
       await addBannerToFirestore({
-        title: newBannerTitle.trim() || `Banner ${cleanSlug}`,
+        title: newBannerTitle.trim() || cleanSlug,
         slug: cleanSlug,
-        imageUrl: newBannerUrl.trim(),
+        imageUrl: rendered.url,
+        originalImageUrl: rawUrl,
         aspectRatio: newBannerRatio,
-        dimensions: '1200x630'
+        fitMode: newBannerFitMode,
+        bgColor: newBannerBgColor,
+        dimensions: rendered.dimensions
       });
+
       await api.createImage({
-        title: newBannerTitle.trim() || `Banner ${cleanSlug}`,
+        title: newBannerTitle.trim() || cleanSlug,
         slug: cleanSlug,
-        imageUrl: newBannerUrl.trim(),
-        dimensions: '1200x630'
+        imageUrl: rendered.url,
+        dimensions: rendered.dimensions
       }).catch(() => {});
 
-      notify(`Đã tạo banner /image/${cleanSlug} với tỉ lệ ${newBannerRatio}!`);
+      notify(`Đã lưu /image/${cleanSlug}`);
       setShowCreateBanner(false);
       setNewBannerTitle('');
       setNewBannerSlug('');
-      setNewBannerUrl('');
+      setNewBannerRawUrl('');
+      setNewBannerRatio('16:9');
+      setNewBannerFitMode('fit');
+      setNewBannerBgColor('#ffffff');
     } catch (err: any) {
       notify('Lỗi: ' + (err.message || 'Không thể lưu banner'));
+    } finally {
+      setIsCreatingBanner(false);
     }
   };
 
-  // Change banner aspect ratio on the fly with persistent Firestore update
+  const applyAndBakeBannerTransform = async (
+    banner: ImageBannerItem,
+    nextRatio: string,
+    nextFitMode: BannerFitMode,
+    nextBgColor: string,
+    overrideRawUrl?: string
+  ) => {
+    const sourceRawUrl = overrideRawUrl || banner.originalImageUrl || banner.imageUrl;
+    try {
+      setProcessingBannerId(banner.id);
+      const rendered = await renderTransformedBannerToServer(
+        sourceRawUrl,
+        nextRatio,
+        nextFitMode,
+        nextBgColor,
+        banner.slug
+      );
+
+      const updates: Partial<ImageBannerItem> = {
+        imageUrl: rendered.url,
+        originalImageUrl: sourceRawUrl,
+        aspectRatio: nextRatio,
+        fitMode: nextFitMode,
+        bgColor: nextBgColor,
+        dimensions: rendered.dimensions
+      };
+
+      await updateBannerInFirestore(banner.id, updates);
+      await api.updateImage(banner.id, { ...updates, slug: banner.slug }).catch(() => {});
+
+      setFailedImages(prev => ({ ...prev, [banner.id]: false }));
+      notify(`Đã cập nhật /image/${banner.slug}`);
+    } catch (err: any) {
+      notify('Lỗi xử lý ảnh: ' + (err.message || 'Không thể cập nhật'));
+    } finally {
+      setProcessingBannerId(null);
+    }
+  };
+
+  const handleReplaceBannerFile = async (banner: ImageBannerItem, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setProcessingBannerId(banner.id);
+      const uploadedRawUrl = await uploadRawFileToServer(file);
+      const currentRatio = cardRatios[banner.id] || banner.aspectRatio || '16:9';
+      const currentFit = cardFitModes[banner.id] || banner.fitMode || 'fit';
+      const currentBg = cardBgColors[banner.id] || banner.bgColor || '#ffffff';
+
+      await applyAndBakeBannerTransform(banner, currentRatio, currentFit, currentBg, uploadedRawUrl);
+      if (editingBannerImgId === banner.id) {
+        setEditingBannerImgId(null);
+      }
+    } catch (err: any) {
+      notify('Lỗi tải ảnh: ' + (err.message || 'Không thể cập nhật'));
+      setProcessingBannerId(null);
+    } finally {
+      e.target.value = '';
+    }
+  };
+
   const handleUpdateBannerRatio = async (banner: ImageBannerItem, newRatio: string) => {
     setCardRatios(prev => ({ ...prev, [banner.id]: newRatio }));
-    try {
-      // 1. Update in Firestore
-      await updateBannerInFirestore(banner.id, { aspectRatio: newRatio });
-      // 2. Update on server backend
-      await api.updateImage(banner.id, { aspectRatio: newRatio, slug: banner.slug }).catch(() => {});
-      notify(`Đã chuyển banner sang tỉ lệ: ${newRatio}`);
-    } catch (err: any) {
-      console.error('Failed to update ratio in Firestore:', err);
-    }
+    const currentFit = cardFitModes[banner.id] || banner.fitMode || 'fit';
+    const currentBg = cardBgColors[banner.id] || banner.bgColor || '#ffffff';
+    await applyAndBakeBannerTransform(banner, newRatio, currentFit, currentBg);
   };
 
-  // Quick edit banner image URL directly
-  const handleStartEditBannerImg = (banner: ImageBannerItem) => {
-    setEditingBannerImgId(banner.id);
-    setTempBannerImgUrl(banner.imageUrl);
+  const handleUpdateFitMode = async (banner: ImageBannerItem, mode: BannerFitMode) => {
+    setCardFitModes(prev => ({ ...prev, [banner.id]: mode }));
+    const currentRatio = cardRatios[banner.id] || banner.aspectRatio || '16:9';
+    const currentBg = cardBgColors[banner.id] || banner.bgColor || '#ffffff';
+    await applyAndBakeBannerTransform(banner, currentRatio, mode, currentBg);
+  };
+
+  const handleUpdateBgColor = async (banner: ImageBannerItem, color: string) => {
+    setCardBgColors(prev => ({ ...prev, [banner.id]: color }));
+    const currentRatio = cardRatios[banner.id] || banner.aspectRatio || '16:9';
+    const currentFit = cardFitModes[banner.id] || banner.fitMode || 'fit';
+    await applyAndBakeBannerTransform(banner, currentRatio, currentFit, color);
   };
 
   const handleSaveBannerImgUrl = async (banner: ImageBannerItem) => {
     const cleanUrl = tempBannerImgUrl.trim();
-    if (!cleanUrl) {
-      notify('Vui lòng nhập đường dẫn ảnh hợp lệ');
-      return;
-    }
-
+    if (!cleanUrl) return;
     try {
       setIsSavingBannerImg(true);
-      await updateBannerInFirestore(banner.id, { imageUrl: cleanUrl });
-      await api.updateImage(banner.id, { imageUrl: cleanUrl, slug: banner.slug }).catch(() => {});
-      
-      setFailedImages(prev => ({ ...prev, [banner.id]: false }));
-      setLoadedImages(prev => ({ ...prev, [banner.id]: false }));
+      const currentRatio = cardRatios[banner.id] || banner.aspectRatio || '16:9';
+      const currentFit = cardFitModes[banner.id] || banner.fitMode || 'fit';
+      const currentBg = cardBgColors[banner.id] || banner.bgColor || '#ffffff';
+
+      await applyAndBakeBannerTransform(banner, currentRatio, currentFit, currentBg, cleanUrl);
       setEditingBannerImgId(null);
-      notify('Đã cập nhật ảnh banner mới!');
-    } catch (err: any) {
-      notify('Lỗi: ' + (err.message || 'Không thể cập nhật ảnh'));
     } finally {
       setIsSavingBannerImg(false);
     }
   };
 
-  // Toggle object fit between contain and cover
-  const toggleFitMode = (id: string) => {
-    setCardFitModes(prev => ({
-      ...prev,
-      [id]: prev[id] === 'contain' ? 'cover' : 'contain'
-    }));
-  };
-
-  // Delete banner - opens in-app confirmation modal
-  const handleDeleteBanner = (id: string, slug: string, title?: string) => {
-    setDeleteModal({
-      isOpen: true,
-      type: 'banner',
-      id,
-      slug,
-      title: title || `/image/${slug}`
-    });
-  };
-
-  // Perform confirmed deletion for either link or banner
   const confirmDelete = async () => {
     if (!deleteModal) return;
     const { type, id, slug } = deleteModal;
     setIsDeleting(true);
-
     try {
       if (type === 'link') {
-        // Optimistic UI update
         setLinks(prev => prev.filter(l => l.id !== id && l.slug !== slug));
         await deleteLinkFromFirestore(id, slug);
         await api.deleteLink(id).catch(() => {});
-        notify(`Đã xóa vĩnh viễn link /link/${slug}`);
+        notify(`Đã xóa /link/${slug}`);
       } else {
-        // Optimistic UI update
         setBanners(prev => prev.filter(b => b.id !== id && b.slug !== slug));
         if (cinemaReviewBanner && (cinemaReviewBanner.id === id || cinemaReviewBanner.slug === slug)) {
           setCinemaReviewBanner(null);
         }
         await deleteBannerFromFirestore(id, slug);
         await api.deleteImage(id).catch(() => {});
-        notify(`Đã xóa vĩnh viễn banner /image/${slug}`);
+        notify(`Đã xóa /image/${slug}`);
       }
       setDeleteModal(null);
     } catch (err: any) {
-      notify(`Lỗi khi xóa: ${err.message || 'Không thể xóa'}`);
+      notify(`Lỗi: ${err.message || 'Không thể xóa'}`);
     } finally {
       setIsDeleting(false);
     }
   };
 
-  // Compute live analytics
+  const getObjectFitClass = (mode: BannerFitMode) => {
+    if (mode === 'fill') return 'object-cover';
+    if (mode === 'stretch') return 'object-fill';
+    return 'object-contain';
+  };
+
   const analyticsData: AnalyticsData = useMemo(() => {
     const totalClicks = links.reduce((sum, l) => sum + (l.totalClicks || 0), 0);
     const uniqueClicks = links.reduce((sum, l) => sum + (l.uniqueClicks || 0), 0);
     const totalBannerViews = banners.reduce((sum, b) => sum + (b.viewsCount || 0), 0);
-
     const now = Date.now();
     const oneDayAgo = now - 24 * 3600 * 1000;
     const sevenDaysAgo = now - 7 * 24 * 3600 * 1000;
@@ -488,7 +613,6 @@ export default function App() {
         if (hourlyMap[hourStr] !== undefined) hourlyMap[hourStr] += 1;
       }
     }
-
     const hourlyTrend: HourlyStat[] = Object.entries(hourlyMap).map(([hour, count]) => ({ hour, count }));
 
     return {
@@ -517,144 +641,134 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-neutral-100 flex flex-col font-sans selection:bg-amber-500 selection:text-black">
-      {/* Toast notification */}
+    <div className="min-h-screen bg-[#f8fafc] text-slate-900 flex flex-col font-sans selection:bg-slate-900 selection:text-white">
       {successToast && (
-        <div className="fixed top-5 right-5 z-50 bg-emerald-500 text-neutral-950 font-bold px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2 text-xs transition-all animate-bounce">
-          <CheckCircle2 className="w-4 h-4" />
+        <div className="fixed top-4 right-4 z-50 bg-slate-900 text-white font-medium px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 text-xs">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           <span>{successToast}</span>
         </div>
       )}
 
-      {/* Simplified Modern Header */}
-      <header className="border-b border-neutral-800/80 bg-neutral-950/80 backdrop-blur-md px-4 sm:px-8 py-3.5 sticky top-0 z-30">
+      <header className="border-b border-slate-200/80 bg-white/90 backdrop-blur-md px-4 sm:px-8 py-3 sticky top-0 z-30">
         <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center font-black text-black text-sm shadow-md shadow-amber-500/20">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center font-black text-white text-xs">
               93
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-lg tracking-tight text-white">ADS93</span>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  ⚡ Firestore Live
-                </span>
-              </div>
-              <p className="text-[11px] text-neutral-400 hidden sm:block">
-                Rút gọn link chuyển hướng siêu tốc & Ảnh banner đa tỉ lệ điện ảnh
-              </p>
-            </div>
+            <span className="font-bold text-base tracking-tight text-slate-900">ADS93</span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+            <button
+              onClick={() => setActiveTab('links')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                activeTab === 'links'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Link2 className="w-3.5 h-3.5" />
+              <span>Link ({links.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('banners')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                activeTab === 'banners'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <ImageIcon className="w-3.5 h-3.5" />
+              <span>Banner ({banners.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('analytics')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                activeTab === 'analytics'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>Thống kê</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => exportToExcel(analyticsData, links, banners, logs)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-200 border border-neutral-800 text-xs font-semibold transition"
-              title="Xuất file Excel"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-medium transition"
+              title="Xuất Excel"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="hidden sm:inline">Xuất Excel</span>
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="hidden sm:inline">Excel</span>
             </button>
             <button
               onClick={() => exportToPdf(analyticsData, links, banners, logs)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-200 border border-neutral-800 text-xs font-semibold transition"
-              title="Xuất file PDF"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-medium transition"
+              title="Xuất PDF"
             >
-              <FileText className="w-3.5 h-3.5 text-rose-400" />
-              <span className="hidden sm:inline">Xuất PDF</span>
+              <FileText className="w-3.5 h-3.5 text-rose-600" />
+              <span className="hidden sm:inline">PDF</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* Main Container */}
-      <main className="max-w-5xl mx-auto w-full px-4 sm:px-8 py-6 flex-1 space-y-6">
-        {/* Simple 3-Tab Selector */}
-        <div className="flex items-center gap-2 border-b border-neutral-800 pb-3">
-          <button
-            onClick={() => setActiveTab('links')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
-              activeTab === 'links'
-                ? 'bg-amber-500 text-neutral-950 shadow-md shadow-amber-500/20'
-                : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
-            }`}
-          >
-            <Link2 className="w-4 h-4" />
-            <span>Link Rút Gọn ({links.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('banners')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
-              activeTab === 'banners'
-                ? 'bg-amber-500 text-neutral-950 shadow-md shadow-amber-500/20'
-                : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
-            }`}
-          >
-            <ImageIcon className="w-4 h-4" />
-            <span>Ảnh Banner ({banners.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('analytics')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
-              activeTab === 'analytics'
-                ? 'bg-amber-500 text-neutral-950 shadow-md shadow-amber-500/20'
-                : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
-            }`}
-          >
-            <BarChart3 className="w-4 h-4" />
-            <span>Thống Kê Lượt Click</span>
-          </button>
-        </div>
-
-        {/* TAB 1: LINKS MANAGEMENT */}
-        {activeTab === 'links' && (
-          <div className="space-y-4">
-            {/* Top Toolbar */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-neutral-900/50 p-3 rounded-2xl border border-neutral-800/80">
-              <div className="relative flex-1 max-w-sm">
-                <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="Tìm link theo slug, tên, đích..."
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-amber-500/60"
-                />
-              </div>
-
-              <button
-                onClick={() => setShowCreateLink(!showCreateLink)}
-                className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-bold transition shadow-sm active:scale-95"
-              >
-                <Plus className="w-4 h-4 stroke-[3]" />
-                <span>Tạo Link Mới</span>
-              </button>
+      <main className="max-w-5xl mx-auto w-full px-4 sm:px-8 py-6 flex-1 space-y-5">
+        {activeTab !== 'analytics' && (
+          <div className="flex items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-xs">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Tìm kiếm..."
+                className="w-full bg-white border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-400 transition"
+              />
             </div>
 
-            {/* Create Link Drawer / Card */}
+            {activeTab === 'links' ? (
+              <button
+                onClick={() => setShowCreateLink(!showCreateLink)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition shadow-xs"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Tạo Link</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowCreateBanner(!showCreateBanner)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition shadow-xs"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Thêm Banner</span>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* TAB 1: LINKS */}
+        {activeTab === 'links' && (
+          <div className="space-y-3">
             {showCreateLink && (
-              <form onSubmit={handleCreateLink} className="p-4 rounded-2xl bg-neutral-900 border border-amber-500/40 space-y-3 text-xs">
-                <div className="font-bold text-white flex items-center gap-2 text-sm">
-                  <Sparkles className="w-4 h-4 text-amber-400" />
-                  <span>Tạo Đường Dẫn Rút Gọn Mới</span>
-                </div>
+              <form onSubmit={handleCreateLink} className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3 text-xs">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-neutral-400 mb-1">Tên chiến dịch:</label>
+                    <label className="block text-slate-500 font-medium mb-1">Tên</label>
                     <input
                       type="text"
                       value={newLinkTitle}
                       onChange={e => setNewLinkTitle(e.target.value)}
-                      placeholder="VD: Kênh YouTube Neon 9393"
-                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                      placeholder="VD: TikTok Bio"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:bg-white focus:outline-none focus:border-slate-400"
                     />
                   </div>
                   <div>
-                    <label className="block text-neutral-400 mb-1">Mã rút gọn (Slug): *</label>
+                    <label className="block text-slate-500 font-medium mb-1">Slug *</label>
                     <div className="flex items-center">
-                      <span className="bg-neutral-950 border border-r-0 border-neutral-800 rounded-l-xl px-2.5 py-2 text-neutral-500 font-mono text-[11px]">
+                      <span className="bg-slate-100 border border-r-0 border-slate-200 rounded-l-xl px-2.5 py-2 text-slate-500 font-mono text-[11px]">
                         /link/
                       </span>
                       <input
@@ -663,211 +777,138 @@ export default function App() {
                         onChange={e => setNewLinkSlug(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '-'))}
                         placeholder="ytb"
                         required
-                        className="flex-1 bg-neutral-950 border border-neutral-800 rounded-r-xl px-2.5 py-2 text-amber-400 font-mono font-bold focus:outline-none focus:border-amber-500"
+                        className="flex-1 bg-slate-50 border border-slate-200 rounded-r-xl px-2.5 py-2 text-slate-900 font-mono font-semibold focus:bg-white focus:outline-none focus:border-slate-400"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-neutral-400 mb-1">Trang đích thực tế: *</label>
+                    <label className="block text-slate-500 font-medium mb-1">Link đích *</label>
                     <input
                       type="text"
                       value={newLinkDest}
                       onChange={e => setNewLinkDest(e.target.value)}
-                      placeholder="https://youtube.com/@neon93"
+                      placeholder="https://..."
                       required
-                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-amber-500"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-mono focus:bg-white focus:outline-none focus:border-slate-400"
                     />
                   </div>
                 </div>
-                <div className="flex items-center justify-end gap-2 pt-2">
+                <div className="flex items-center justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => setShowCreateLink(false)}
-                    className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-medium"
+                    className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium"
                   >
                     Hủy
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold"
+                    className="px-4 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-semibold"
                   >
-                    Lưu Link
+                    Lưu
                   </button>
                 </div>
               </form>
             )}
 
-            {/* Links List Cards */}
-            <div className="space-y-3">
-              {filteredLinks.length === 0 ? (
-                <div className="py-12 text-center text-neutral-500 text-xs bg-neutral-900/30 rounded-2xl border border-neutral-800/80">
-                  Chưa có link nào. Hãy nhấn "+ Tạo Link Mới" ở trên!
-                </div>
-              ) : (
-                filteredLinks.map(link => {
-                  const shortUrl = `${origin}/link/${link.slug}`;
-                  const currentDest = editingDest[link.id] !== undefined ? editingDest[link.id] : link.destinationUrl;
-                  const hasChanged = currentDest.trim() !== link.destinationUrl.trim();
+            {filteredLinks.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 text-xs bg-white rounded-2xl border border-slate-200/80">
+                Chưa có link nào.
+              </div>
+            ) : (
+              filteredLinks.map(link => {
+                const shortUrl = `${origin}/link/${link.slug}`;
+                const currentDest = editingDest[link.id] !== undefined ? editingDest[link.id] : link.destinationUrl;
+                const hasChanged = currentDest.trim() !== link.destinationUrl.trim();
 
-                  return (
-                    <div
-                      key={link.id}
-                      className="p-4 rounded-2xl bg-neutral-900/70 border border-neutral-800 hover:border-neutral-700 transition space-y-3"
-                    >
-                      {/* Top Bar of Card */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-800/60 pb-2.5">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-white text-sm">{link.title}</span>
-                          <span className="text-[10px] text-neutral-400 font-mono">
-                            ({link.totalClicks || 0} clicks)
-                          </span>
-                        </div>
-
-                        {/* Short link copy & direct jump bar */}
-                        <div className="flex items-center gap-1.5 self-start sm:self-center">
-                          <span className="font-mono text-xs font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                            {shortUrl}
-                          </span>
-                          <button
-                            onClick={() => handleCopy(shortUrl)}
-                            className="p-1.5 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white transition flex items-center gap-1 text-xs"
-                            title="Sao chép link rút gọn"
-                          >
-                            {copiedText === shortUrl ? (
-                              <>
-                                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                                <span className="text-emerald-400 text-[10px]">Đã chép</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-3.5 h-3.5" />
-                                <span className="text-[10px]">Chép link</span>
-                              </>
-                            )}
-                          </button>
-
-                          {/* Direct redirect: Jumps instantly to destination without any intermediate page */}
-                          <a
-                            href={shortUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="p-1.5 rounded bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold transition flex items-center gap-1 text-[11px]"
-                            title="Thử nhảy ngay sang trang đích"
-                          >
-                            <span>Thử link</span>
-                            <ExternalLink className="w-3 h-3 stroke-[3]" />
-                          </a>
-                        </div>
+                return (
+                  <div
+                    key={link.id}
+                    className="p-4 rounded-2xl bg-white border border-slate-200/90 hover:border-slate-300 transition shadow-2xs space-y-2.5"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 text-sm">{link.title}</span>
+                        <span className="text-[11px] text-slate-500 font-mono bg-slate-100 px-2 py-0.5 rounded-md">
+                          {link.totalClicks || 0} clicks
+                        </span>
                       </div>
 
-                      {/* Instant Editable Destination URL */}
-                      <div>
-                        <div className="flex items-center justify-between text-[11px] mb-1">
-                          <span className="text-neutral-400 font-medium">Trang đích thực tế (Sửa link rồi bấm lưu để chuyển hướng ngay):</span>
-                          {hasChanged && (
-                            <span className="text-amber-400 font-semibold animate-pulse">
-                              * Đã có thay đổi chưa lưu
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={currentDest}
-                            onChange={e => {
-                              const val = e.target.value;
-                              setEditingDest(prev => ({ ...prev, [link.id]: val }));
-                            }}
-                            placeholder="https://..."
-                            className="flex-1 bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-xl px-3 py-2 text-xs text-white font-mono transition"
-                          />
-                          <button
-                            onClick={() => handleSaveDestination(link)}
-                            disabled={savingDestId === link.id}
-                            className={`px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm ${
-                              hasChanged
-                                ? 'bg-emerald-500 hover:bg-emerald-400 text-neutral-950'
-                                : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-200'
-                            }`}
-                          >
-                            {savingDestId === link.id ? 'Đang lưu...' : (hasChanged ? 'Lưu Đích Mới' : 'Cập Nhật')}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Bottom action row */}
-                      <div className="flex items-center justify-between text-[11px] pt-1 text-neutral-400">
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => setQrData({ isOpen: true, url: shortUrl, title: link.title })}
-                            className="flex items-center gap-1 hover:text-white"
-                          >
-                            <QrCode className="w-3.5 h-3.5" />
-                            <span>Mã QR</span>
-                          </button>
-                          <a
-                            href={link.destinationUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="hover:text-amber-400 flex items-center gap-1 font-mono line-clamp-1 max-w-[200px] sm:max-w-xs"
-                          >
-                            <span>Mở thẳng link đích</span>
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        </div>
-
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-xs font-semibold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
+                          /link/{link.slug}
+                        </span>
                         <button
-                          onClick={() => handleDeleteLink(link.id, link.slug, link.title)}
-                          className="text-neutral-500 hover:text-rose-400 flex items-center gap-1 transition"
-                          title="Xóa link rút gọn này"
+                          onClick={() => handleCopy(shortUrl)}
+                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+                          title="Sao chép link"
+                        >
+                          {copiedText === shortUrl ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                        <button
+                          onClick={() => setQrData({ isOpen: true, url: shortUrl, title: link.title })}
+                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+                          title="Mã QR"
+                        >
+                          <QrCode className="w-3.5 h-3.5" />
+                        </button>
+                        <a
+                          href={shortUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+                          title="Mở thử"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                        <button
+                          onClick={() => setDeleteModal({ isOpen: true, type: 'link', id: link.id, slug: link.slug, title: link.title })}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                          title="Xóa"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
-                          <span>Xóa link</span>
                         </button>
                       </div>
                     </div>
-                  );
-                })
-              )}
-            </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={currentDest}
+                        onChange={e => setEditingDest(prev => ({ ...prev, [link.id]: e.target.value }))}
+                        placeholder="https://..."
+                        className="flex-1 bg-slate-50 border border-slate-200 focus:bg-white focus:border-slate-400 rounded-xl px-3 py-1.5 text-xs text-slate-800 font-mono focus:outline-none transition"
+                      />
+                      <button
+                        onClick={() => handleSaveDestination(link)}
+                        disabled={savingDestId === link.id}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition ${
+                          hasChanged
+                            ? 'bg-slate-900 hover:bg-slate-800 text-white'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                        }`}
+                      >
+                        {savingDestId === link.id ? '...' : 'Lưu'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         )}
 
-        {/* TAB 2: BANNERS MANAGEMENT */}
+        {/* TAB 2: BANNERS */}
         {activeTab === 'banners' && (
           <div className="space-y-4">
-            {/* Top Toolbar */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-neutral-900/50 p-3 rounded-2xl border border-neutral-800/80">
-              <div className="space-y-0.5">
-                <div className="text-xs font-bold text-white flex items-center gap-2">
-                  <Film className="w-4 h-4 text-amber-400" />
-                  <span>Quản lý Banner Ảnh & Xem Review Trực Quan</span>
-                </div>
-                <div className="text-[11px] text-neutral-400">
-                  Hỗ trợ 19+ tỉ lệ: Điện ảnh 2.4:1, 2.35:1, 21:9, 16:9, TikTok 9:16, Vuông 1:1, Header 3:1...
-                </div>
-              </div>
-              <button
-                onClick={() => setShowCreateBanner(!showCreateBanner)}
-                className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-bold transition shadow-sm active:scale-95 shrink-0"
-              >
-                <Plus className="w-4 h-4 stroke-[3]" />
-                <span>Thêm Ảnh Banner Mới</span>
-              </button>
-            </div>
-
-            {/* Create Banner Form */}
             {showCreateBanner && (
-              <form onSubmit={handleCreateBanner} className="p-4 rounded-2xl bg-neutral-900 border border-amber-500/40 space-y-4 text-xs">
-                <div className="font-bold text-white flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <Film className="w-4 h-4 text-amber-400" />
-                    <span>Thêm Ảnh Banner & Tùy Chọn Tỉ Lệ Khung Hình</span>
-                  </div>
-                  <button 
-                    type="button" 
+              <form onSubmit={handleCreateBanner} className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-900 text-sm">Thêm Banner</span>
+                  <button
+                    type="button"
                     onClick={() => setShowCreateBanner(false)}
-                    className="p-1 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-white"
+                    className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -875,19 +916,19 @@ export default function App() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-neutral-400 mb-1">Tên ảnh / mô tả:</label>
+                    <label className="block text-slate-500 font-medium mb-1">Tên banner</label>
                     <input
                       type="text"
                       value={newBannerTitle}
                       onChange={e => setNewBannerTitle(e.target.value)}
-                      placeholder="VD: Banner Điện Ảnh Siêu Phẩm"
-                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                      placeholder="VD: Banner chính"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:bg-white focus:outline-none focus:border-slate-400"
                     />
                   </div>
                   <div>
-                    <label className="block text-neutral-400 mb-1">Mã ảnh slug: *</label>
+                    <label className="block text-slate-500 font-medium mb-1">Slug *</label>
                     <div className="flex items-center">
-                      <span className="bg-neutral-950 border border-r-0 border-neutral-800 rounded-l-xl px-2.5 py-2 text-neutral-500 font-mono text-[11px]">
+                      <span className="bg-slate-100 border border-r-0 border-slate-200 rounded-l-xl px-2.5 py-2 text-slate-500 font-mono text-[11px]">
                         /image/
                       </span>
                       <input
@@ -896,378 +937,362 @@ export default function App() {
                         onChange={e => setNewBannerSlug(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '-'))}
                         placeholder="banner1"
                         required
-                        className="flex-1 bg-neutral-950 border border-neutral-800 rounded-r-xl px-2.5 py-2 text-amber-400 font-mono font-bold focus:outline-none focus:border-amber-500"
+                        className="flex-1 bg-slate-50 border border-slate-200 rounded-r-xl px-2.5 py-2 text-slate-900 font-mono font-semibold focus:bg-white focus:outline-none focus:border-slate-400"
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* Aspect Ratio Selector */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-neutral-300 font-semibold flex items-center gap-1.5">
-                      <Film className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Chọn Tỉ Lệ Khung Hình:</span>
-                      <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-mono font-bold text-[10px]">
-                        {newBannerRatio}
-                      </span>
-                    </label>
-
-                    {/* Filter categories */}
-                    <div className="flex items-center gap-1">
-                      {['Tất cả', 'Điện ảnh', 'Tiêu chuẩn', 'Khổ Dọc', 'Mạng xã hội'].map(cat => (
-                        <button
-                          key={cat}
-                          type="button"
-                          onClick={() => setBannerCategoryFilter(cat)}
-                          className={`px-2 py-0.5 rounded text-[10px] transition ${
-                            bannerCategoryFilter === cat
-                              ? 'bg-neutral-700 text-white font-bold'
-                              : 'bg-neutral-950 text-neutral-400 hover:text-white'
-                          }`}
-                        >
-                          {cat}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2 max-h-48 overflow-y-auto pr-1">
-                    {ASPECT_RATIOS
-                      .filter(r => bannerCategoryFilter === 'Tất cả' || r.category === bannerCategoryFilter)
-                      .map(item => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => setNewBannerRatio(item.id)}
-                          className={`p-2 rounded-xl text-left border transition text-xs flex flex-col justify-between ${
-                            newBannerRatio === item.id
-                              ? 'bg-amber-500/15 border-amber-500 text-amber-400 font-bold shadow-sm'
-                              : 'bg-neutral-950 border-neutral-800 text-neutral-300 hover:border-neutral-700'
-                          }`}
-                        >
-                          <span className="truncate font-semibold">{item.label}</span>
-                          <span className="text-[10px] text-neutral-500 line-clamp-1 mt-0.5">{item.desc}</span>
-                        </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Image Upload / Input */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="text-neutral-400">Nguồn ảnh: *</label>
-                    <label className={`cursor-pointer text-[11px] flex items-center gap-1 ${isUploadingImage ? 'text-amber-400 animate-pulse' : 'text-amber-400 hover:text-amber-300 font-semibold'}`}>
+                    <label className="text-slate-500 font-medium">Ảnh *</label>
+                    <label className="cursor-pointer text-xs font-semibold text-slate-900 hover:text-slate-700 flex items-center gap-1 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg transition">
                       <Upload className="w-3.5 h-3.5" />
-                      <span>{isUploadingImage ? 'Đang tải lên...' : 'Tải ảnh từ máy tính'}</span>
+                      <span>{isUploadingImage ? 'Đang tải...' : 'Chọn ảnh từ máy'}</span>
                       <input
                         type="file"
                         accept="image/*"
                         disabled={isUploadingImage}
-                        onChange={handleUploadBannerFile}
+                        onChange={handleUploadNewBannerFile}
                         className="hidden"
                       />
                     </label>
                   </div>
                   <input
                     type="text"
-                    value={newBannerUrl}
-                    onChange={e => setNewBannerUrl(e.target.value)}
-                    placeholder="Dán link ảnh (VD: https://sephoang.onrender.com/uploads/banner.png)"
+                    value={newBannerRawUrl}
+                    onChange={e => setNewBannerRawUrl(e.target.value)}
+                    placeholder="https://... hoặc chọn ảnh từ máy"
                     required
-                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-amber-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-mono focus:bg-white focus:outline-none focus:border-slate-400"
                   />
-
-                  {/* Quick sample chips */}
-                  <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                    <span className="text-[10px] text-neutral-500">Mẫu sẵn:</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNewBannerUrl('https://sephoang.onrender.com/uploads/banner.png');
-                        if (!newBannerSlug) setNewBannerSlug('banner1');
-                        if (!newBannerTitle) setNewBannerTitle('Banner Sephoang');
-                      }}
-                      className="px-2 py-0.5 rounded bg-neutral-950 hover:bg-neutral-800 border border-neutral-800 text-[10px] text-amber-400 font-mono transition"
-                    >
-                      Dùng mẫu sephoang.png
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNewBannerUrl('https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=1600&auto=format&fit=crop');
-                        setNewBannerRatio('2.4:1');
-                        if (!newBannerSlug) setNewBannerSlug('cinema-film');
-                        if (!newBannerTitle) setNewBannerTitle('Điện Ảnh 2.4:1');
-                      }}
-                      className="px-2 py-0.5 rounded bg-neutral-950 hover:bg-neutral-800 border border-neutral-800 text-[10px] text-neutral-300 font-mono transition"
-                    >
-                      Mẫu Điện Ảnh 2.4:1
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNewBannerUrl('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop');
-                        setNewBannerRatio('16:9');
-                        if (!newBannerSlug) setNewBannerSlug('widescreen-banner');
-                        if (!newBannerTitle) setNewBannerTitle('Màn Rộng 16:9');
-                      }}
-                      className="px-2 py-0.5 rounded bg-neutral-950 hover:bg-neutral-800 border border-neutral-800 text-[10px] text-neutral-300 font-mono transition"
-                    >
-                      Mẫu 16:9
-                    </button>
-                  </div>
                 </div>
 
-                {/* LIVE PREVIEW BOX - ALWAYS VISIBLE */}
-                <div className="p-3 rounded-2xl bg-neutral-950 border border-neutral-800 space-y-2">
-                  <div className="text-[11px] text-neutral-400 flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 font-semibold text-white">
-                      <Eye className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Khung Ảnh Review Xem Trước (Tỉ lệ: <span className="text-amber-400 font-mono">{newBannerRatio}</span>)</span>
-                    </div>
-                    <span className="text-neutral-500">Chuẩn rạp & hiển thị thực tế</span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                  <div>
+                    <label className="block text-slate-500 font-medium mb-1">Tỉ lệ</label>
+                    <select
+                      value={newBannerRatio}
+                      onChange={e => setNewBannerRatio(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-mono focus:bg-white focus:outline-none"
+                    >
+                      {ASPECT_RATIOS.map(r => (
+                        <option key={r.id} value={r.id}>{r.label}</option>
+                      ))}
+                    </select>
                   </div>
 
-                  <div 
-                    className="w-full bg-[#050505] rounded-xl overflow-hidden flex items-center justify-center border border-neutral-800 relative transition-all"
-                    style={{ 
-                      aspectRatio: (ASPECT_RATIOS.find(r => r.id === newBannerRatio)?.ratio || '2.4 / 1') === 'auto' ? '16 / 9' : (ASPECT_RATIOS.find(r => r.id === newBannerRatio)?.ratio || '2.4 / 1'),
-                      maxHeight: '280px' 
-                    }}
-                  >
-                    {newBannerUrl ? (
-                      <img 
-                        src={newBannerUrl} 
-                        alt="Preview" 
-                        className="w-full h-full object-cover transition-opacity duration-300"
-                        onError={e => {
-                          (e.target as HTMLElement).style.opacity = '0.5';
-                        }}
+                  <div>
+                    <label className="block text-slate-500 font-medium mb-1">Kiểu khung</label>
+                    <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl">
+                      {FIT_MODES.map(m => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setNewBannerFitMode(m.id)}
+                          className={`py-1.5 rounded-lg text-xs font-semibold transition ${
+                            newBannerFitMode === m.id
+                              ? 'bg-white text-slate-900 shadow-2xs'
+                              : 'text-slate-500 hover:text-slate-900'
+                          }`}
+                        >
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-500 font-medium mb-1">Màu nền (Fit)</label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="color"
+                        value={newBannerBgColor}
+                        onChange={e => setNewBannerBgColor(e.target.value)}
+                        className="w-9 h-8 rounded-lg border border-slate-200 cursor-pointer bg-white p-0.5 shrink-0"
                       />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center text-center p-4 text-neutral-600 space-y-1">
-                        <ImageIcon className="w-8 h-8 opacity-40" />
-                        <span className="text-xs">Dán link ảnh hoặc chọn tệp để xem khung preview tỉ lệ {newBannerRatio}</span>
+                      <input
+                        type="text"
+                        value={newBannerBgColor}
+                        onChange={e => setNewBannerBgColor(e.target.value)}
+                        className="w-20 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 font-mono text-xs text-slate-800"
+                      />
+                      <div className="flex items-center gap-1 overflow-x-auto">
+                        {PRESET_COLORS.slice(0, 5).map(c => (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => setNewBannerBgColor(c)}
+                            className={`w-5 h-5 rounded-full border ${
+                              newBannerBgColor.toLowerCase() === c ? 'border-slate-900 scale-110' : 'border-slate-300'
+                            }`}
+                            style={{ backgroundColor: c }}
+                          />
+                        ))}
                       </div>
-                    )}
-
-                    {/* Cinema frame border watermark */}
-                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/70 backdrop-blur text-[10px] text-amber-400 font-mono border border-neutral-800">
-                      TỈ LỆ: {newBannerRatio}
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-2">
+                {newBannerRawUrl && (
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                    <div
+                      className="w-full rounded-lg overflow-hidden flex items-center justify-center border border-slate-200 mx-auto transition-all"
+                      style={{
+                        aspectRatio: (ASPECT_RATIOS.find(r => r.id === newBannerRatio)?.ratio || '16 / 9') === 'auto'
+                          ? '16 / 9'
+                          : (ASPECT_RATIOS.find(r => r.id === newBannerRatio)?.ratio || '16 / 9'),
+                        maxHeight: '260px',
+                        backgroundColor: newBannerBgColor
+                      }}
+                    >
+                      <img
+                        src={newBannerRawUrl}
+                        alt="Preview"
+                        className={`w-full h-full ${getObjectFitClass(newBannerFitMode)}`}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-2 pt-1">
                   <button
                     type="button"
                     onClick={() => setShowCreateBanner(false)}
-                    className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-medium"
+                    className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium"
                   >
                     Hủy
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold"
+                    disabled={isCreatingBanner || isUploadingImage}
+                    className="px-4 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-semibold disabled:opacity-50"
                   >
-                    Lưu Ảnh Banner
+                    {isCreatingBanner ? 'Đang lưu...' : 'Lưu Banner'}
                   </button>
                 </div>
               </form>
             )}
 
-            {/* Banners Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {filteredBanners.length === 0 ? (
-                <div className="col-span-full py-16 text-center border-2 border-dashed border-neutral-800 rounded-2xl p-6 space-y-2">
-                  <ImageIcon className="w-8 h-8 text-neutral-600 mx-auto" />
-                  <div className="text-sm font-bold text-white">Chưa có banner nào</div>
-                  <p className="text-xs text-neutral-500 max-w-sm mx-auto">
-                    Bấm "+ Thêm Ảnh Banner Mới" để thêm banner và tận hưởng khả năng điều chỉnh tỉ lệ điện ảnh 2.4:1, 16:9, 1:1, 9:16...
-                  </p>
+                <div className="col-span-full py-12 text-center bg-white border border-slate-200/80 rounded-2xl text-xs text-slate-400">
+                  Chưa có banner nào.
                 </div>
               ) : (
                 filteredBanners.map(banner => {
                   const directImageUrl = `${origin}/image/${banner.slug}`;
-                  const currentRatioId = cardRatios[banner.id] || banner.aspectRatio || '2.4:1';
+                  const currentRatioId = cardRatios[banner.id] || banner.aspectRatio || '16:9';
                   const ratioObj = ASPECT_RATIOS.find(r => r.id === currentRatioId) || ASPECT_RATIOS[0];
-                  const fitMode = cardFitModes[banner.id] || 'cover';
+                  const fitMode: BannerFitMode = cardFitModes[banner.id] || banner.fitMode || 'fit';
+                  const bgColor = cardBgColors[banner.id] || banner.bgColor || '#ffffff';
                   const isImageFailed = failedImages[banner.id];
                   const isLoaded = loadedImages[banner.id];
                   const isEditingThisImg = editingBannerImgId === banner.id;
-
-                  // Render direct image source with fallback to server endpoint
-                  const rawSrc = banner.imageUrl;
+                  const isProcessingThis = processingBannerId === banner.id;
+                  const isColorOpen = openColorPickerId === banner.id;
 
                   return (
                     <div
                       key={banner.id}
-                      className="rounded-2xl bg-neutral-900 border border-neutral-800 overflow-hidden flex flex-col justify-between group hover:border-neutral-700 transition"
+                      className="rounded-2xl bg-white border border-slate-200/90 hover:border-slate-300 shadow-2xs overflow-hidden flex flex-col justify-between transition"
                     >
-                      {/* Top Header of Card */}
-                      <div className="p-3 border-b border-neutral-800 flex items-center justify-between gap-2">
+                      <div className="px-3.5 py-2.5 border-b border-slate-100 flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 truncate">
-                          <span className="font-bold text-white text-xs truncate">{banner.title}</span>
-                          <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
+                          <span className="font-bold text-slate-900 text-xs truncate">{banner.title}</span>
+                          <span className="font-mono text-[11px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 shrink-0">
                             /image/{banner.slug}
                           </span>
                         </div>
-                        <span className="text-[11px] font-mono text-neutral-400 shrink-0">
-                          {banner.viewsCount || 0} views
+                        <span className="text-[11px] font-mono text-slate-400 shrink-0">
+                          {isProcessingThis ? 'Đang lưu...' : `${banner.viewsCount || 0} views`}
                         </span>
                       </div>
 
-                      {/* Aspect Ratio Switcher Bar on Card */}
-                      <div className="px-3 py-1.5 bg-neutral-950/70 border-b border-neutral-800/60 flex items-center justify-between text-[11px] gap-2">
-                        <div className="flex items-center gap-1 overflow-x-auto py-0.5 scrollbar-none flex-1">
-                          <Film className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                          <span className="text-neutral-400 mr-1 shrink-0 text-[10px]">Tỉ lệ:</span>
-                          
-                          {/* Quick popular chips */}
-                          {['2.4:1', '16:9', '21:9', '1:1', '9:16', '3:1'].map(r => (
+                      <div className="px-3.5 py-2 bg-slate-50/70 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                        <div className="flex items-center gap-1">
+                          {QUICK_RATIOS.slice(0, 4).map(r => (
                             <button
                               key={r}
                               type="button"
+                              disabled={isProcessingThis}
                               onClick={() => handleUpdateBannerRatio(banner, r)}
-                              className={`px-1.5 py-0.5 rounded font-mono text-[10px] transition shrink-0 ${
+                              className={`px-2 py-0.5 rounded-md font-mono text-[10px] transition ${
                                 currentRatioId === r
-                                  ? 'bg-amber-500 text-neutral-950 font-bold shadow-sm'
-                                  : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-300'
+                                  ? 'bg-slate-900 text-white font-semibold'
+                                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
                               }`}
                             >
                               {r}
                             </button>
                           ))}
-
-                          {/* Full dropdown of all 19+ aspect ratios */}
                           <select
                             value={currentRatioId}
+                            disabled={isProcessingThis}
                             onChange={e => handleUpdateBannerRatio(banner, e.target.value)}
-                            className="bg-neutral-800 border border-neutral-700 rounded text-[10px] text-neutral-200 px-1 py-0.5 font-mono focus:outline-none shrink-0"
-                            title="Chọn trong tất cả tỉ lệ"
+                            className="bg-white border border-slate-200 rounded-md text-[10px] text-slate-700 px-1.5 py-0.5 font-mono focus:outline-none"
                           >
-                            <optgroup label="Tất cả tỉ lệ có sẵn:">
-                              {ASPECT_RATIOS.map(item => (
-                                <option key={item.id} value={item.id}>
-                                  {item.label}
-                                </option>
-                              ))}
-                            </optgroup>
+                            {ASPECT_RATIOS.map(item => (
+                              <option key={item.id} value={item.id}>{item.label}</option>
+                            ))}
                           </select>
                         </div>
 
-                        {/* Mode toggles */}
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex items-center bg-slate-200/70 p-0.5 rounded-lg">
+                            {FIT_MODES.map(m => (
+                              <button
+                                key={m.id}
+                                type="button"
+                                disabled={isProcessingThis}
+                                onClick={() => handleUpdateFitMode(banner, m.id)}
+                                className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition ${
+                                  fitMode === m.id
+                                    ? 'bg-white text-slate-900 shadow-2xs'
+                                    : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                              >
+                                {m.label}
+                              </button>
+                            ))}
+                          </div>
+
                           <button
-                            onClick={() => toggleFitMode(banner.id)}
-                            className="text-[10px] font-mono text-neutral-400 hover:text-white px-1.5 py-0.5 rounded bg-neutral-800/80 transition"
-                            title="Chuyển chế độ lấp đầy (cover) hoặc trọn vẹn (contain)"
+                            type="button"
+                            onClick={() => setOpenColorPickerId(isColorOpen ? null : banner.id)}
+                            className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white border border-slate-200 hover:border-slate-300 text-[10px] text-slate-700"
+                            title="Màu nền"
                           >
-                            {fitMode === 'cover' ? 'Lấp đầy [Cover]' : 'Trọn vẹn [Contain]'}
+                            <span
+                              className="w-3.5 h-3.5 rounded-xs border border-slate-300 inline-block"
+                              style={{ backgroundColor: bgColor }}
+                            />
+                            <Palette className="w-3 h-3 text-slate-500" />
                           </button>
                         </div>
                       </div>
 
-                      {/* Preview Image Box in Chosen Ratio */}
-                      <div 
-                        className="w-full bg-[#050505] overflow-hidden flex items-center justify-center relative p-1 border-b border-neutral-800 cursor-pointer"
-                        style={{ 
+                      {isColorOpen && (
+                        <div className="px-3.5 py-2 bg-white border-b border-slate-100 flex items-center justify-between gap-2 text-xs">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <input
+                              type="color"
+                              value={bgColor}
+                              onChange={e => handleUpdateBgColor(banner, e.target.value)}
+                              className="w-6 h-6 rounded border border-slate-200 cursor-pointer p-0 bg-white"
+                            />
+                            <input
+                              type="text"
+                              value={bgColor}
+                              onChange={e => handleUpdateBgColor(banner, e.target.value)}
+                              className="w-16 bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 font-mono text-[11px] text-slate-800"
+                            />
+                            {PRESET_COLORS.map(c => (
+                              <button
+                                key={c}
+                                type="button"
+                                onClick={() => handleUpdateBgColor(banner, c)}
+                                className={`w-4 h-4 rounded-full border transition ${
+                                  bgColor.toLowerCase() === c ? 'border-slate-900 scale-110 ring-1 ring-slate-900' : 'border-slate-300'
+                                }`}
+                                style={{ backgroundColor: c }}
+                              />
+                            ))}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setOpenColorPickerId(null)}
+                            className="text-[11px] text-slate-400 hover:text-slate-700"
+                          >
+                            Đóng
+                          </button>
+                        </div>
+                      )}
+
+                      <div
+                        className="w-full overflow-hidden flex items-center justify-center relative border-b border-slate-100 cursor-pointer transition-colors"
+                        style={{
                           aspectRatio: ratioObj.ratio === 'auto' ? undefined : ratioObj.ratio,
-                          minHeight: '140px',
-                          maxHeight: '340px'
+                          minHeight: '160px',
+                          maxHeight: '320px',
+                          backgroundColor: bgColor
                         }}
                         onClick={() => setCinemaReviewBanner(banner)}
-                        title="Bấm để mở chế độ xem phim toàn cảnh (Cinema Review)"
                       >
                         {!isImageFailed ? (
                           <div className="w-full h-full relative flex items-center justify-center">
-                            {/* Loading skeleton placeholder */}
-                            {!isLoaded && (
-                              <div className="absolute inset-0 bg-neutral-900 animate-pulse flex items-center justify-center">
-                                <Film className="w-6 h-6 text-neutral-700 animate-spin" />
+                            {(!isLoaded || isProcessingThis) && (
+                              <div className="absolute inset-0 bg-slate-100/80 backdrop-blur-2xs z-10 flex items-center justify-center gap-2 text-xs font-medium text-slate-600">
+                                <RotateCw className="w-4 h-4 text-slate-700 animate-spin" />
                               </div>
                             )}
-
                             <img
-                              src={rawSrc}
+                              src={banner.imageUrl}
                               alt={banner.title}
                               onLoad={() => {
                                 setLoadedImages(prev => ({ ...prev, [banner.id]: true }));
                                 setFailedImages(prev => ({ ...prev, [banner.id]: false }));
                               }}
                               onError={() => {
-                                // If direct image fails, try proxy endpoint /image/:slug
                                 setFailedImages(prev => ({ ...prev, [banner.id]: true }));
                               }}
-                              className={`w-full h-full rounded transition-all duration-300 ${
-                                fitMode === 'cover' ? 'object-cover' : 'object-contain'
-                              } ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+                              className="w-full h-full object-contain transition-opacity duration-200"
                             />
-
-                            {/* Badge watermark */}
-                            <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/75 backdrop-blur text-[10px] text-amber-400 font-mono border border-neutral-800 pointer-events-none">
-                              {ratioObj.badge}
-                            </div>
                           </div>
                         ) : (
-                          // Fallback view with direct URL edit & retry
-                          <div 
-                            className="w-full h-full min-h-[160px] flex flex-col items-center justify-center p-4 text-center bg-neutral-950 space-y-2"
+                          <div
+                            className="w-full h-full min-h-[160px] flex flex-col items-center justify-center p-4 text-center bg-slate-50 space-y-2"
                             onClick={e => e.stopPropagation()}
                           >
-                            <ImageIcon className="w-6 h-6 text-rose-400" />
-                            <div className="text-[11px] text-neutral-300 font-medium">
-                              Không thể tải ảnh từ liên kết:
-                            </div>
-                            <div className="font-mono text-[10px] text-amber-400 truncate max-w-[260px] bg-neutral-900 px-2 py-1 rounded border border-neutral-800">
-                              {banner.imageUrl}
-                            </div>
-                            <div className="flex items-center gap-2 pt-1">
-                              <button
-                                onClick={() => {
-                                  setFailedImages(prev => ({ ...prev, [banner.id]: false }));
-                                  setLoadedImages(prev => ({ ...prev, [banner.id]: false }));
-                                }}
-                                className="px-2.5 py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-xs text-neutral-200 flex items-center gap-1"
-                              >
-                                <RotateCw className="w-3 h-3" />
-                                <span>Thử tải lại</span>
-                              </button>
-                              <button
-                                onClick={() => handleStartEditBannerImg(banner)}
-                                className="px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 text-xs text-neutral-950 font-bold flex items-center gap-1"
-                              >
-                                <Edit2 className="w-3 h-3" />
-                                <span>Đổi link ảnh</span>
-                              </button>
-                            </div>
+                            <span className="text-xs text-slate-500">Không tải được ảnh</span>
+                            <label className="cursor-pointer px-3 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1">
+                              <Upload className="w-3 h-3" />
+                              <span>Tải ảnh lên</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={e => handleReplaceBannerFile(banner, e)}
+                                className="hidden"
+                              />
+                            </label>
                           </div>
                         )}
                       </div>
 
-                      {/* Inline Image URL Editor if toggled */}
                       {isEditingThisImg && (
-                        <div className="p-3 bg-neutral-950 border-b border-neutral-800 space-y-2">
-                          <label className="text-[10px] text-neutral-400 font-semibold">Cập nhật link ảnh trực tiếp:</label>
-                          <div className="flex items-center gap-2">
+                        <div className="p-3 bg-slate-50 border-b border-slate-100 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] text-slate-500 font-medium">Link ảnh hoặc tải file:</span>
+                            <label className="cursor-pointer text-[11px] font-semibold text-slate-900 bg-white border border-slate-200 hover:bg-slate-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                              <Upload className="w-3 h-3" />
+                              <span>Chọn file</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                disabled={isProcessingThis}
+                                onChange={e => handleReplaceBannerFile(banner, e)}
+                                className="hidden"
+                              />
+                            </label>
+                          </div>
+                          <div className="flex items-center gap-1.5">
                             <input
                               type="text"
                               value={tempBannerImgUrl}
                               onChange={e => setTempBannerImgUrl(e.target.value)}
                               placeholder="https://..."
-                              className="flex-1 bg-neutral-900 border border-amber-500/50 rounded-xl px-2.5 py-1.5 text-xs text-white font-mono"
+                              className="flex-1 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 font-mono focus:outline-none focus:border-slate-400"
                             />
                             <button
                               onClick={() => handleSaveBannerImgUrl(banner)}
                               disabled={isSavingBannerImg}
-                              className="px-3 py-1.5 rounded-xl bg-amber-500 text-neutral-950 font-bold text-xs hover:bg-amber-400"
+                              className="px-3 py-1.5 rounded-lg bg-slate-900 text-white font-semibold text-xs hover:bg-slate-800"
                             >
-                              {isSavingBannerImg ? 'Lưu...' : 'Lưu'}
+                              Lưu
                             </button>
                             <button
                               onClick={() => setEditingBannerImgId(null)}
-                              className="px-2 py-1.5 rounded-xl bg-neutral-800 text-neutral-300 text-xs hover:bg-neutral-700"
+                              className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 text-xs hover:bg-slate-100"
                             >
                               Hủy
                             </button>
@@ -1275,68 +1300,67 @@ export default function App() {
                         </div>
                       )}
 
-                      {/* Footer Actions */}
-                      <div className="p-3 space-y-2">
-                        {/* Copy URL */}
-                        <div className="flex items-center justify-between text-xs bg-neutral-950 p-2 rounded-xl border border-neutral-800">
-                          <span className="font-mono text-neutral-300 text-[11px] truncate mr-2">
-                            {directImageUrl}
-                          </span>
+                      <div className="p-3 flex items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <label className="cursor-pointer px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-[11px] flex items-center gap-1 transition">
+                            <Upload className="w-3 h-3" />
+                            <span>{isProcessingThis ? '...' : 'Đổi ảnh'}</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              disabled={isProcessingThis}
+                              onChange={e => handleReplaceBannerFile(banner, e)}
+                              className="hidden"
+                            />
+                          </label>
+
                           <button
-                            onClick={() => handleCopy(directImageUrl)}
-                            className="p-1 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 shrink-0"
-                            title="Sao chép link ảnh trực tiếp"
+                            onClick={() => {
+                              setEditingBannerImgId(isEditingThisImg ? null : banner.id);
+                              setTempBannerImgUrl(banner.originalImageUrl || banner.imageUrl);
+                            }}
+                            className="px-2 py-1 rounded-lg hover:bg-slate-100 text-slate-600 text-[11px] flex items-center gap-1 transition"
                           >
-                            {copiedText === directImageUrl ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-400" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
+                            <Edit2 className="w-3 h-3" />
+                            <span>Link</span>
                           </button>
                         </div>
 
-                        {/* Action buttons */}
-                        <div className="flex items-center justify-between pt-1 text-xs">
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => setCinemaReviewBanner(banner)}
-                              className="flex items-center gap-1 text-amber-400 hover:text-amber-300 font-semibold text-[11px]"
-                            >
-                              <Eye className="w-3 h-3" />
-                              <span>Xem Review Rạp</span>
-                            </button>
-
-                            <button
-                              onClick={() => handleStartEditBannerImg(banner)}
-                              className="text-neutral-400 hover:text-white text-[11px] flex items-center gap-1"
-                              title="Sửa link nguồn ảnh"
-                            >
-                              <Edit2 className="w-3 h-3" />
-                              <span>Sửa link</span>
-                            </button>
-                          </div>
-
-                          <div className="flex items-center gap-3">
-                            <a
-                              href={directImageUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-neutral-400 hover:text-white flex items-center gap-1 text-[11px]"
-                              title="Mở ảnh trên tab mới"
-                            >
-                              <span>Tab mới</span>
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
-
-                            <button
-                              onClick={() => handleDeleteBanner(banner.id, banner.slug, banner.title)}
-                              className="text-neutral-500 hover:text-rose-400 text-[11px] flex items-center gap-1 transition"
-                              title="Xóa banner này"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                              <span>Xóa</span>
-                            </button>
-                          </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleCopy(directImageUrl)}
+                            className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-[11px] flex items-center gap-1 transition"
+                          >
+                            {copiedText === directImageUrl ? (
+                              <Check className="w-3 h-3 text-emerald-600" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                            <span>Chép link</span>
+                          </button>
+                          <button
+                            onClick={() => setCinemaReviewBanner(banner)}
+                            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition"
+                            title="Phóng to"
+                          >
+                            <Maximize2 className="w-3.5 h-3.5" />
+                          </button>
+                          <a
+                            href={`${directImageUrl}?t=${new Date(banner.updatedAt || Date.now()).getTime()}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition"
+                            title="Mở tab mới"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                          <button
+                            onClick={() => setDeleteModal({ isOpen: true, type: 'banner', id: banner.id, slug: banner.slug, title: banner.title })}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                            title="Xóa"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -1349,55 +1373,47 @@ export default function App() {
 
         {/* TAB 3: ANALYTICS */}
         {activeTab === 'analytics' && (
-          <div className="space-y-6">
-            {/* 3 Simple KPI Cards */}
+          <div className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800">
-                <div className="text-xs text-neutral-400 mb-1">Tổng Lượt Click</div>
-                <div className="text-2xl sm:text-3xl font-extrabold text-white font-mono">
+              <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs">
+                <div className="text-xs text-slate-500 mb-1">Tổng Lượt Click</div>
+                <div className="text-2xl font-bold text-slate-900 font-mono">
                   {analyticsData.totalClicks.toLocaleString()}
                 </div>
-                <div className="text-[11px] text-amber-400 mt-1">+{analyticsData.clicks24h} trong 24 giờ qua</div>
+                <div className="text-[11px] text-slate-400 mt-1">+{analyticsData.clicks24h} trong 24h</div>
               </div>
-
-              <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800">
-                <div className="text-xs text-neutral-400 mb-1">Khách Độc Nhất (Unique)</div>
-                <div className="text-2xl sm:text-3xl font-extrabold text-emerald-400 font-mono">
+              <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs">
+                <div className="text-xs text-slate-500 mb-1">Unique Clicks</div>
+                <div className="text-2xl font-bold text-emerald-600 font-mono">
                   {analyticsData.uniqueClicks.toLocaleString()}
                 </div>
-                <div className="text-[11px] text-neutral-500 mt-1">Đo lường theo thiết bị & địa chỉ IP</div>
+                <div className="text-[11px] text-slate-400 mt-1">Theo IP & Thiết bị</div>
               </div>
-
-              <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800">
-                <div className="text-xs text-neutral-400 mb-1">Lượt Xem Ảnh Banner</div>
-                <div className="text-2xl sm:text-3xl font-extrabold text-white font-mono">
+              <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs">
+                <div className="text-xs text-slate-500 mb-1">Lượt Xem Banner</div>
+                <div className="text-2xl font-bold text-slate-900 font-mono">
                   {analyticsData.totalBannerViews.toLocaleString()}
                 </div>
-                <div className="text-[11px] text-neutral-500 mt-1">Yêu cầu từ direct /image/:slug</div>
+                <div className="text-[11px] text-slate-400 mt-1">Truy cập /image/:slug</div>
               </div>
             </div>
 
-            {/* Traffic Sources & Devices */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Traffic Sources */}
-              <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-3">
-                <div className="font-bold text-white text-xs flex items-center justify-between">
-                  <span>Phân Bổ Theo Nguồn (Traffic Sources)</span>
-                  <span className="text-[10px] text-neutral-500 font-normal">Real-time</span>
-                </div>
+              <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-3">
+                <div className="font-bold text-slate-900 text-xs">Nguồn Truy Cập</div>
                 <div className="space-y-2">
                   {analyticsData.sources.length === 0 ? (
-                    <div className="text-xs text-neutral-500 py-6 text-center">Chưa có dữ liệu nguồn click nào</div>
+                    <div className="text-xs text-slate-400 py-6 text-center">Chưa có dữ liệu</div>
                   ) : (
                     analyticsData.sources.map(src => (
                       <div key={src.name} className="space-y-1">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-neutral-300 font-medium">{src.name}</span>
-                          <span className="font-mono text-neutral-400 text-[11px]">{src.count} ({src.percentage}%)</span>
+                          <span className="text-slate-700 font-medium">{src.name}</span>
+                          <span className="font-mono text-slate-500 text-[11px]">{src.count} ({src.percentage}%)</span>
                         </div>
-                        <div className="w-full bg-neutral-950 rounded-full h-1.5 overflow-hidden">
-                          <div 
-                            className="bg-amber-500 h-full rounded-full transition-all duration-500" 
+                        <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className="bg-slate-900 h-full rounded-full transition-all duration-500"
                             style={{ width: `${src.percentage}%` }}
                           />
                         </div>
@@ -1407,66 +1423,50 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Devices Breakdown */}
-              <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-3">
-                <div className="font-bold text-white text-xs flex items-center justify-between">
-                  <span>Thiết Bị Người Dùng</span>
-                  <span className="text-[10px] text-neutral-500 font-normal">Tự động nhận diện</span>
-                </div>
+              <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-3">
+                <div className="font-bold text-slate-900 text-xs">Thiết Bị</div>
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800">
-                    <div className="text-[11px] text-neutral-400">Mobile</div>
-                    <div className="text-lg font-bold text-white font-mono mt-0.5">{analyticsData.devices.Mobile || 0}</div>
-                  </div>
-                  <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800">
-                    <div className="text-[11px] text-neutral-400">Desktop</div>
-                    <div className="text-lg font-bold text-white font-mono mt-0.5">{analyticsData.devices.Desktop || 0}</div>
-                  </div>
-                  <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800">
-                    <div className="text-[11px] text-neutral-400">Tablet</div>
-                    <div className="text-lg font-bold text-white font-mono mt-0.5">{analyticsData.devices.Tablet || 0}</div>
-                  </div>
-                  <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800">
-                    <div className="text-[11px] text-neutral-400">Khác</div>
-                    <div className="text-lg font-bold text-white font-mono mt-0.5">{analyticsData.devices.Other || 0}</div>
-                  </div>
+                  {(['Mobile', 'Desktop', 'Tablet', 'Other'] as const).map(dev => (
+                    <div key={dev} className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                      <div className="text-[11px] text-slate-500">{dev}</div>
+                      <div className="text-lg font-bold text-slate-900 font-mono mt-0.5">
+                        {analyticsData.devices[dev] || 0}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
 
-            {/* Recent Clicks Live Stream */}
-            <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-3">
-              <div className="font-bold text-white text-xs flex items-center justify-between">
-                <span>Nhật Ký Lượt Click Gần Đây ({logs.length})</span>
-                <span className="text-[10px] text-emerald-400 font-semibold">Tự động đồng bộ</span>
-              </div>
+            <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-3">
+              <div className="font-bold text-slate-900 text-xs">Nhật Ký Click ({logs.length})</div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-[11px]">
                   <thead>
-                    <tr className="border-b border-neutral-800 text-neutral-500">
-                      <th className="py-2 px-2">Thời Gian</th>
+                    <tr className="border-b border-slate-200 text-slate-400">
+                      <th className="py-2 px-2">Thời gian</th>
                       <th className="py-2 px-2">Link</th>
                       <th className="py-2 px-2">Nguồn</th>
-                      <th className="py-2 px-2">Thiết Bị</th>
-                      <th className="py-2 px-2">Trình Duyệt</th>
+                      <th className="py-2 px-2">Thiết bị</th>
+                      <th className="py-2 px-2">Trình duyệt</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-neutral-800/40 font-mono">
-                    {logs.slice(0, 10).map(log => (
-                      <tr key={log.id} className="hover:bg-neutral-800/30">
-                        <td className="py-2 px-2 text-neutral-400">
+                  <tbody className="divide-y divide-slate-100 font-mono">
+                    {logs.slice(0, 15).map(log => (
+                      <tr key={log.id} className="hover:bg-slate-50">
+                        <td className="py-2 px-2 text-slate-500">
                           {new Date(log.timestamp).toLocaleTimeString('vi-VN')} {new Date(log.timestamp).toLocaleDateString('vi-VN')}
                         </td>
-                        <td className="py-2 px-2 text-amber-400 font-bold">/link/{log.linkSlug}</td>
-                        <td className="py-2 px-2 text-white">{log.source}</td>
-                        <td className="py-2 px-2 text-neutral-300">{log.device}</td>
-                        <td className="py-2 px-2 text-neutral-400">{log.browser}</td>
+                        <td className="py-2 px-2 text-slate-900 font-semibold">/link/{log.linkSlug}</td>
+                        <td className="py-2 px-2 text-slate-700">{log.source}</td>
+                        <td className="py-2 px-2 text-slate-600">{log.device}</td>
+                        <td className="py-2 px-2 text-slate-500">{log.browser}</td>
                       </tr>
                     ))}
                     {logs.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="py-8 text-center text-neutral-500">
-                          Chưa có lượt click nào được ghi nhận. Thử bấm "Thử link" ở tab Link Rút Gọn!
+                        <td colSpan={5} className="py-8 text-center text-slate-400 font-sans">
+                          Chưa có lượt click nào.
                         </td>
                       </tr>
                     )}
@@ -1478,161 +1478,122 @@ export default function App() {
         )}
       </main>
 
-      {/* CINEMA REVIEW MODAL (FULLSCREEN LIGHTBOX) */}
       {cinemaReviewBanner && (
-        <div 
-          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-in fade-in duration-200"
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex flex-col items-center justify-center p-4"
           onClick={() => setCinemaReviewBanner(null)}
         >
-          {/* Top header bar */}
-          <div 
-            className="w-full max-w-5xl flex items-center justify-between text-white pb-3 border-b border-neutral-800 mb-4"
+          <div
+            className="bg-white border border-slate-200 rounded-2xl max-w-4xl w-full p-4 shadow-xl space-y-3"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex items-center gap-2">
-              <Film className="w-5 h-5 text-amber-400" />
-              <div>
-                <h3 className="text-sm font-bold">{cinemaReviewBanner.title}</h3>
-                <span className="font-mono text-xs text-amber-400">/image/{cinemaReviewBanner.slug}</span>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-slate-900 text-sm">{cinemaReviewBanner.title}</span>
+                <span className="font-mono text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                  /image/{cinemaReviewBanner.slug}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="flex items-center bg-slate-100 p-0.5 rounded-lg">
+                  {FIT_MODES.map(m => (
+                    <button
+                      key={m.id}
+                      onClick={() => handleUpdateFitMode(cinemaReviewBanner, m.id)}
+                      className={`px-2.5 py-1 rounded-md text-xs font-semibold transition ${
+                        (cardFitModes[cinemaReviewBanner.id] || cinemaReviewBanner.fitMode || 'fit') === m.id
+                          ? 'bg-white text-slate-900 shadow-2xs'
+                          : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+
+                <input
+                  type="color"
+                  value={cardBgColors[cinemaReviewBanner.id] || cinemaReviewBanner.bgColor || '#ffffff'}
+                  onChange={e => handleUpdateBgColor(cinemaReviewBanner, e.target.value)}
+                  className="w-7 h-7 rounded border border-slate-200 cursor-pointer bg-white p-0.5"
+                />
+
+                <button
+                  onClick={() => setCinemaReviewBanner(null)}
+                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-1 rounded-full bg-neutral-800 text-xs font-mono text-neutral-200 border border-neutral-700">
-                Tỉ lệ: {cardRatios[cinemaReviewBanner.id] || cinemaReviewBanner.aspectRatio || '2.4:1'}
-              </span>
-              <a
-                href={`${origin}/image/${cinemaReviewBanner.slug}`}
-                target="_blank"
-                rel="noreferrer"
-                className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs flex items-center gap-1"
-              >
-                <span>Mở link ảnh</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-              <button
-                onClick={() => handleDeleteBanner(cinemaReviewBanner.id, cinemaReviewBanner.slug, cinemaReviewBanner.title)}
-                className="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 font-semibold text-xs flex items-center gap-1 transition"
-                title="Xóa banner này"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Xóa banner</span>
-              </button>
-              <button
-                onClick={() => setCinemaReviewBanner(null)}
-                className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
+            <div className="w-full rounded-xl overflow-hidden border border-slate-200 flex items-center justify-center mx-auto bg-slate-50">
+              <img
+                src={banners.find(b => b.id === cinemaReviewBanner.id)?.imageUrl || cinemaReviewBanner.imageUrl}
+                alt={cinemaReviewBanner.title}
+                className="max-h-[70vh] w-auto object-contain"
+              />
             </div>
-          </div>
 
-          {/* Cinematic Letterbox Container */}
-          <div 
-            className="w-full max-w-5xl bg-black rounded-2xl overflow-hidden border border-neutral-800 flex items-center justify-center shadow-2xl relative"
-            style={{ 
-              aspectRatio: (ASPECT_RATIOS.find(r => r.id === (cardRatios[cinemaReviewBanner.id] || cinemaReviewBanner.aspectRatio || '2.4:1'))?.ratio || '2.4 / 1') === 'auto' ? undefined : (ASPECT_RATIOS.find(r => r.id === (cardRatios[cinemaReviewBanner.id] || cinemaReviewBanner.aspectRatio || '2.4:1'))?.ratio || '2.4 / 1'),
-              maxHeight: '75vh' 
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <img
-              src={cinemaReviewBanner.imageUrl}
-              alt={cinemaReviewBanner.title}
-              className={`w-full h-full ${
-                (cardFitModes[cinemaReviewBanner.id] || 'cover') === 'cover' ? 'object-cover' : 'object-contain'
-              }`}
-            />
-            
-            {/* Cinematic crop frame markings */}
-            <div className="absolute top-3 left-3 px-2 py-0.5 rounded bg-black/80 text-[11px] font-mono text-amber-400 border border-neutral-700">
-              CINEMA RATIO: {cardRatios[cinemaReviewBanner.id] || cinemaReviewBanner.aspectRatio || '2.4:1'}
+            <div className="flex items-center justify-center gap-1.5 pt-1 flex-wrap">
+              {ASPECT_RATIOS.map(r => (
+                <button
+                  key={r.id}
+                  onClick={() => handleUpdateBannerRatio(cinemaReviewBanner, r.id)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-mono transition ${
+                    (cardRatios[cinemaReviewBanner.id] || cinemaReviewBanner.aspectRatio || '16:9') === r.id
+                      ? 'bg-slate-900 text-white font-semibold'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
             </div>
-          </div>
-
-          {/* Quick ratio switchers inside modal */}
-          <div 
-            className="w-full max-w-5xl flex items-center justify-center gap-1.5 pt-4 overflow-x-auto"
-            onClick={e => e.stopPropagation()}
-          >
-            {['2.4:1', '2.35:1', '21:9', '16:9', '2:1', '1.91:1', '3:1', '1:1', '9:16', 'auto'].map(r => (
-              <button
-                key={r}
-                onClick={() => handleUpdateBannerRatio(cinemaReviewBanner, r)}
-                className={`px-2.5 py-1 rounded-xl text-xs font-mono transition ${
-                  (cardRatios[cinemaReviewBanner.id] || cinemaReviewBanner.aspectRatio) === r
-                    ? 'bg-amber-500 text-neutral-950 font-bold'
-                    : 'bg-neutral-900 border border-neutral-800 text-neutral-300 hover:bg-neutral-800'
-                }`}
-              >
-                {r}
-              </button>
-            ))}
           </div>
         </div>
       )}
 
-      {/* IN-APP DELETE CONFIRMATION MODAL - NO BROWSER POPUPS */}
       {deleteModal && (
-        <div 
-          className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs"
           onClick={() => !isDeleting && setDeleteModal(null)}
         >
-          <div 
-            className="bg-neutral-900 border border-neutral-800 rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl relative"
+          <div
+            className="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-xl"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0 text-rose-400">
-                <Trash2 className="w-6 h-6" />
-              </div>
-              <div className="space-y-1.5 flex-1">
-                <h3 className="text-base font-bold text-white">
-                  Xác nhận xóa {deleteModal.type === 'link' ? 'Link Rút Gọn' : 'Ảnh Banner'}?
-                </h3>
-                <p className="text-xs text-neutral-400 leading-relaxed">
-                  Bạn có chắc chắn muốn xóa vĩnh viễn{' '}
-                  <span className="font-semibold text-rose-400 font-mono">
-                    {deleteModal.type === 'link' ? `/link/${deleteModal.slug}` : `/image/${deleteModal.slug}`}
-                  </span>
-                  {deleteModal.title ? ` (${deleteModal.title})` : ''}? Dữ liệu sẽ được xóa hoàn toàn khỏi cơ sở dữ liệu Firestore.
-                </p>
-              </div>
+            <div className="space-y-1">
+              <h3 className="text-sm font-bold text-slate-900">
+                Xóa {deleteModal.type === 'link' ? `/link/${deleteModal.slug}` : `/image/${deleteModal.slug}`}?
+              </h3>
+              <p className="text-xs text-slate-500">
+                Dữ liệu sẽ bị xóa vĩnh viễn.
+              </p>
             </div>
-
-            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-neutral-800/80">
+            <div className="flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setDeleteModal(null)}
                 disabled={isDeleting}
-                className="px-4 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-semibold transition"
+                className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium"
               >
-                Hủy bỏ
+                Hủy
               </button>
               <button
                 type="button"
                 onClick={confirmDelete}
                 disabled={isDeleting}
-                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-rose-950/50"
+                className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold"
               >
-                {isDeleting ? (
-                  <>
-                    <RotateCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Đang xóa...</span>
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Xác Nhận Xóa</span>
-                  </>
-                )}
+                {isDeleting ? 'Đang xóa...' : 'Xóa'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* QR Code Modal */}
       {qrData.isOpen && (
         <QRCodeModal
           isOpen={qrData.isOpen}

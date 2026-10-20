@@ -1,22 +1,16 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Global Default Deny
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // Helper functions
     function isValidId(id) {
       return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
     function incoming() {
       return request.resource.data;
-    }
-
-    function existing() {
-      return resource.data;
     }
 
     function isValidLink(data) {
@@ -32,9 +26,12 @@ service cloud.firestore {
       return data.title is string && data.title.size() <= 200
         && data.slug is string && data.slug.size() <= 100 && data.slug.matches('^[a-zA-Z0-9_\\-]+$')
         && data.imageUrl is string && data.imageUrl.size() <= 5000
+        && (!('originalImageUrl' in data) || (data.originalImageUrl is string && data.originalImageUrl.size() <= 5000))
         && data.isActive is bool
         && data.viewsCount is number && data.viewsCount >= 0
-        && (!('aspectRatio' in data) || (data.aspectRatio is string && data.aspectRatio.size() <= 20));
+        && (!('aspectRatio' in data) || (data.aspectRatio is string && data.aspectRatio is string && data.aspectRatio.size() <= 20))
+        && (!('fitMode' in data) || (data.fitMode is string && data.fitMode.size() <= 20))
+        && (!('bgColor' in data) || (data.bgColor is string && data.bgColor.size() <= 30));
     }
 
     function isValidClickLog(data) {
@@ -45,7 +42,6 @@ service cloud.firestore {
         && data.isUnique is bool;
     }
 
-    // Links collection
     match /links/{linkId} {
       allow read: if true;
       allow create: if isValidId(linkId) && isValidLink(incoming());
@@ -53,7 +49,6 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // Images collection
     match /images/{imageId} {
       allow read: if true;
       allow create: if isValidId(imageId) && isValidImage(incoming());
@@ -61,7 +56,6 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // Click logs stream (append-only)
     match /click_logs/{logId} {
       allow read: if true;
       allow create: if isValidId(logId) && isValidClickLog(incoming());

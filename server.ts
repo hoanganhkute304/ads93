@@ -42,7 +42,6 @@ if (fs.existsSync(firebaseConfigFile)) {
     const fbApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
     firestoreDb = getFirestore(fbApp, firebaseConfig.firestoreDatabaseId);
 
-    // Attach real-time snapshot listeners
     onSnapshot(collection(firestoreDb, 'links'), snapshot => {
       snapshot.docChanges().forEach(change => {
         const data = { id: change.doc.id, ...change.doc.data() } as any;
@@ -89,7 +88,6 @@ function parseSource(req: Request): { source: string; utmSource?: string; utmMed
   if (customSrc) {
     return { source: customSrc, utmSource: customSrc, utmMedium, utmCampaign };
   }
-
   if (referer) {
     const lowerRef = referer.toLowerCase();
     if (lowerRef.includes('tiktok.com') || lowerRef.includes('musical.ly')) return { source: 'TikTok', referrer: referer };
@@ -109,7 +107,6 @@ function parseSource(req: Request): { source: string; utmSource?: string; utmMed
     }
   }
 
-  // Check query params for fbclid, ttclid, gclid
   if (query.ttclid) return { source: 'TikTok Ads' };
   if (query.fbclid) return { source: 'Facebook Ads' };
   if (query.gclid) return { source: 'Google Ads' };
@@ -153,20 +150,22 @@ function parseBrowser(userAgent: string): { browser: string; os: string } {
 
 async function startServer() {
   const app = express();
-
-  app.use(express.json({ limit: '25mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '25mb' }));
-  app.use('/uploads', express.static(UPLOADS_DIR));
+  app.use(express.json({ limit: '35mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '35mb' }));
+  app.use('/uploads', express.static(UPLOADS_DIR, {
+    setHeaders: (res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cache-Control', 'no-cache');
+    }
+  }));
 
   // --- REDIRECT ROUTE: /link/:slug ---
   app.get('/link/:slug', async (req: Request, res: Response) => {
     const rawSlug = req.params.slug;
     const slug = rawSlug.trim().toLowerCase();
 
-    // 1. Check live Firestore memory map
     let link = liveLinks.get(slug);
 
-    // 2. Query Firestore directly as fallback
     if (!link && firestoreDb) {
       try {
         const q = query(collection(firestoreDb, 'links'), where('slug', '==', slug));
@@ -180,32 +179,22 @@ async function startServer() {
       }
     }
 
-    // 3. Fallback to local db.ts
     if (!link) {
       link = db.getLinkBySlug(slug);
     }
 
-    if (!link) {
-      // Direct instant fallback to dashboard or default link - never show intermediate 404 card
+    if (!link || link.isActive === false) {
       return res.redirect(302, '/');
     }
 
-    if (link.isActive === false) {
-      // Paused link silently redirects to home dashboard or destination
-      return res.redirect(302, '/');
-    }
-
-    // Extract tracking metadata
     const userAgent = (req.headers['user-agent'] || '') as string;
     const referrer = (req.headers['referer'] || req.headers['referrer'] || '') as string;
     const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || req.socket.remoteAddress || '127.0.0.1';
     const sourceInfo = parseSource(req);
     const device = parseDevice(userAgent);
     const { browser, os } = parseBrowser(userAgent);
-
     const timestamp = new Date().toISOString();
 
-    // Async record click into Firestore
     if (firestoreDb) {
       const logId = `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
       setDoc(doc(firestoreDb, 'click_logs', logId), {
@@ -235,7 +224,6 @@ async function startServer() {
       }
     }
 
-    // Record in local db as backup
     try {
       db.recordClick(link, {
         source: sourceInfo.source,
@@ -249,15 +237,13 @@ async function startServer() {
         os,
         ip
       });
-    } catch (e) {}
+    } catch {}
 
-    // Build final destination URL: forward any UTM parameters attached by caller
     let finalUrl = (link.destinationUrl || '').trim();
     if (!finalUrl) {
       return res.redirect(302, '/');
     }
 
-    // Ensure valid absolute URL protocol
     if (!/^https?:\/\//i.test(finalUrl)) {
       finalUrl = 'https://' + finalUrl;
     }
@@ -272,30 +258,29 @@ async function startServer() {
           }
         }
         finalUrl = dest.toString();
-      } catch {
-        // Fall back to clean finalUrl
-      }
+      } catch {}
     }
 
-    // Direct 302 instant redirect to destination without any intermediate page
     res.setHeader('Location', finalUrl);
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    res.setHeader('Surrogate-Control', 'no-store');
-    return res.status(302).send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=${encodeURI(finalUrl)}"><script>window.location.replace(${JSON.stringify(finalUrl)});</script></head><body style="background:#0a0a0c;margin:0;"></body></html>`);
+    return res.status(302).send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=${encodeURI(finalUrl)}"><script>window.location.replace(${JSON.stringify(finalUrl)});</script></head><body style="background:#f8fafc;margin:0;"></body></html>`);
   });
 
   // --- IMAGE BANNER ROUTE: /image/:slug ---
   app.get('/image/:slug', async (req: Request, res: Response) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
+    // Tắt cache để mỗi khi đổi tỉ lệ (VD: 9:16 -> 16:9 Fill) ảnh cập nhật ngay lập tức
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
     const rawSlug = req.params.slug;
     const slug = rawSlug.trim().toLowerCase();
 
-    // 1. Check live Firestore memory map
     let banner = liveImages.get(slug);
 
-    // 2. Query Firestore directly as fallback
     if (!banner && firestoreDb) {
       try {
         const q = query(collection(firestoreDb, 'images'), where('slug', '==', slug));
@@ -309,24 +294,21 @@ async function startServer() {
       }
     }
 
-    // 3. Fallback to local db.ts
     if (!banner) {
       banner = db.getImageBySlug(slug);
     }
 
     if (!banner) {
-      // Return minimalist SVG 404 image
       res.setHeader('Content-Type', 'image/svg+xml');
       return res.status(404).send(`
         <svg xmlns="http://www.w3.org/2000/svg" width="600" height="300" viewBox="0 0 600 300">
-          <rect width="600" height="300" fill="#171717"/>
-          <text x="50%" y="45%" dominant-baseline="middle" text-anchor="middle" fill="#ef4444" font-family="sans-serif" font-size="22" font-weight="bold">ADS93 - Ảnh không tồn tại</text>
-          <text x="50%" y="60%" dominant-baseline="middle" text-anchor="middle" fill="#737373" font-family="sans-serif" font-size="14">Mã slug: ${slug}</text>
+          <rect width="600" height="300" fill="#f8fafc"/>
+          <text x="50%" y="45%" dominant-baseline="middle" text-anchor="middle" fill="#0f172a" font-family="sans-serif" font-size="20" font-weight="bold">ADS93 - Không tìm thấy ảnh</text>
+          <text x="50%" y="60%" dominant-baseline="middle" text-anchor="middle" fill="#64748b" font-family="sans-serif" font-size="14">/image/${slug}</text>
         </svg>
       `);
     }
 
-    // Increment view count in Firestore
     if (firestoreDb && banner.id) {
       updateDoc(doc(firestoreDb, 'images', banner.id), {
         viewsCount: increment(1)
@@ -334,37 +316,29 @@ async function startServer() {
     }
     db.incrementImageView(slug);
 
-    // If client requested json
     if (req.query.format === 'json') {
       return res.json({ success: true, banner });
     }
 
-    // Direct image serving
     const imageUrl = banner.imageUrl;
 
-    // Check if it's a local uploaded file in /uploads
     if (imageUrl.startsWith('/uploads/') || imageUrl.startsWith('uploads/')) {
       const cleanPath = imageUrl.startsWith('/') ? imageUrl.slice(1) : imageUrl;
       const localFilePath = path.resolve(process.cwd(), 'data', cleanPath);
       if (fs.existsSync(localFilePath)) {
-        res.setHeader('Cache-Control', 'public, max-age=86400');
-        res.setHeader('Access-Control-Allow-Origin', '*');
         return res.sendFile(localFilePath);
       }
     }
 
-    // Check if it's a data URI
     if (imageUrl.startsWith('data:image/')) {
       const parts = imageUrl.split(',');
       const match = parts[0].match(/:(.*?);/);
       const mime = match ? match[1] : 'image/png';
       const buffer = Buffer.from(parts[1], 'base64');
       res.setHeader('Content-Type', mime);
-      res.setHeader('Cache-Control', 'public, max-age=3600');
       return res.send(buffer);
     }
 
-    // External URL: proxy/stream image directly with proper headers so embedding works seamlessly!
     if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
       try {
         const response = await fetch(imageUrl, {
@@ -373,11 +347,10 @@ async function startServer() {
             'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
           }
         });
+
         if (response.ok) {
           const contentType = response.headers.get('content-type') || banner.contentType || 'image/png';
           res.setHeader('Content-Type', contentType);
-          res.setHeader('Cache-Control', 'public, max-age=3600');
-          res.setHeader('Access-Control-Allow-Origin', '*');
           const arrayBuffer = await response.arrayBuffer();
           return res.send(Buffer.from(arrayBuffer));
         }
@@ -390,7 +363,28 @@ async function startServer() {
     return res.redirect(imageUrl);
   });
 
-  // --- REST APIS ---
+  // Proxy helper cho phép Canvas tải ảnh ngoài không bị dính lỗi CORS
+  app.get('/api/proxy-image', async (req: Request, res: Response) => {
+    const targetUrl = req.query.url as string;
+    if (!targetUrl) return res.status(400).send('Missing url');
+    try {
+      const response = await fetch(targetUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'image/*,*/*;q=0.8'
+        }
+      });
+      if (!response.ok) return res.status(response.status).send('Fetch failed');
+      const contentType = response.headers.get('content-type') || 'image/png';
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      const arrayBuffer = await response.arrayBuffer();
+      return res.send(Buffer.from(arrayBuffer));
+    } catch (e) {
+      return res.status(500).send('Proxy error');
+    }
+  });
+
   // Upload API
   app.post('/api/upload', (req: Request, res: Response) => {
     try {
@@ -419,6 +413,7 @@ async function startServer() {
         .replace(/[^a-zA-Z0-9_-]/g, '_');
       const finalFilename = `${safeName}_${Date.now()}.${ext}`;
       const filePath = path.join(UPLOADS_DIR, finalFilename);
+
       fs.writeFileSync(filePath, buffer);
 
       const relativeUrl = `/uploads/${finalFilename}`;
@@ -432,11 +427,11 @@ async function startServer() {
       });
     } catch (err: any) {
       console.error('Upload error:', err);
-      res.status(500).json({ success: false, error: err.message || 'Lỗi khi lưu tệp ảnh' });
+      res.status(500).json({ success: false, error: err.message || 'Lỗi khi lưu ảnh' });
     }
   });
 
-  // Links
+  // Links REST API
   app.get('/api/links', (_req: Request, res: Response) => {
     if (liveLinks.size > 0) {
       return res.json({ success: true, data: Array.from(liveLinks.values()) });
@@ -462,19 +457,17 @@ async function startServer() {
       let updated: any = null;
       try {
         updated = db.updateLink(id, payload);
-      } catch (e) {
+      } catch {
         updated = { id, ...payload };
       }
 
-      // Update Firestore if available
       if (firestoreDb) {
         try {
           await updateDoc(doc(firestoreDb, 'links', id), {
             ...payload,
             updatedAt: new Date().toISOString()
           });
-        } catch (e) {
-          // If id in firestore is different, search by slug
+        } catch {
           if (payload.slug) {
             const q = query(collection(firestoreDb, 'links'), where('slug', '==', payload.slug));
             const snap = await getDocs(q);
@@ -503,19 +496,16 @@ async function startServer() {
       const id = req.params.id;
       db.deleteLink(id);
       
-      // Remove from in-memory cache
       for (const [slug, item] of liveLinks.entries()) {
         if (item.id === id || slug === id.toLowerCase()) {
           liveLinks.delete(slug);
         }
       }
 
-      // Delete from Firestore
       if (firestoreDb) {
         try {
           await deleteDoc(doc(firestoreDb, 'links', id));
-        } catch (e) {
-          // If id was slug or different key, query by slug
+        } catch {
           const q = query(collection(firestoreDb, 'links'), where('slug', '==', id.toLowerCase()));
           const snap = await getDocs(q);
           snap.forEach(d => deleteDoc(d.ref));
@@ -523,12 +513,12 @@ async function startServer() {
       }
 
       res.json({ success: true });
-    } catch (err: any) {
+    } catch {
       res.json({ success: true });
     }
   });
 
-  // Images
+  // Images REST API
   app.get('/api/images', (_req: Request, res: Response) => {
     if (liveImages.size > 0) {
       return res.json({ success: true, data: Array.from(liveImages.values()) });
@@ -551,12 +541,13 @@ async function startServer() {
       let updated: any = null;
       try {
         updated = db.updateImage(req.params.id, req.body);
-      } catch (e) {
+      } catch {
         updated = { id: req.params.id, ...req.body };
       }
 
       if (req.body.slug) {
-        liveImages.set(req.body.slug.toLowerCase(), updated);
+        const existing = liveImages.get(req.body.slug.toLowerCase()) || {};
+        liveImages.set(req.body.slug.toLowerCase(), { ...existing, ...updated, ...req.body });
       }
 
       if (firestoreDb) {
@@ -565,8 +556,7 @@ async function startServer() {
             ...req.body,
             updatedAt: new Date().toISOString()
           });
-        } catch (e) {
-          // If doc id differed, search by slug
+        } catch {
           if (req.body.slug) {
             const q = query(collection(firestoreDb, 'images'), where('slug', '==', req.body.slug.toLowerCase()));
             const snap = await getDocs(q);
@@ -591,18 +581,16 @@ async function startServer() {
       const id = req.params.id;
       db.deleteImage(id);
 
-      // Remove from in-memory cache
       for (const [slug, item] of liveImages.entries()) {
         if (item.id === id || slug === id.toLowerCase()) {
           liveImages.delete(slug);
         }
       }
 
-      // Delete from Firestore
       if (firestoreDb) {
         try {
           await deleteDoc(doc(firestoreDb, 'images', id));
-        } catch (e) {
+        } catch {
           const q = query(collection(firestoreDb, 'images'), where('slug', '==', id.toLowerCase()));
           const snap = await getDocs(q);
           snap.forEach(d => deleteDoc(d.ref));
@@ -610,7 +598,7 @@ async function startServer() {
       }
 
       res.json({ success: true });
-    } catch (err: any) {
+    } catch {
       res.json({ success: true });
     }
   });
@@ -627,7 +615,6 @@ async function startServer() {
     res.json({ success: true, data: db.getLogs(limit, linkSlug, source) });
   });
 
-  // Simulation test click for user to verify tracking in real-time
   app.post('/api/test-click', (req: Request, res: Response) => {
     const { slug, source = 'TikTok Ads', device = 'Mobile' } = req.body;
     const cleanSlug = (slug || '').toLowerCase();
@@ -635,6 +622,7 @@ async function startServer() {
     if (!link) {
       return res.status(404).json({ success: false, error: 'Link không tồn tại' });
     }
+
     const log = db.recordClick(link, {
       source,
       referrer: source === 'Direct' ? '' : `https://m.${source.toLowerCase().replace(/\s+/g, '')}.com/`,
@@ -644,16 +632,15 @@ async function startServer() {
       os: 'Simulated OS',
       ip: `113.160.${Math.floor(Math.random() * 200)}.${Math.floor(Math.random() * 250)}`
     });
+
     res.json({ success: true, data: log, link });
   });
 
-  // Reset demo seed
   app.post('/api/reset', (_req: Request, res: Response) => {
     db.resetSeed();
-    res.json({ success: true, message: 'Đã khôi phục dữ liệu mẫu thành công' });
+    res.json({ success: true, message: 'Khôi phục dữ liệu thành công' });
   });
 
-  // Vite or static serving
   if (!isProd) {
     const vite = await createViteServer({
       server: { middlewareMode: true },

@@ -1,3 +1,5 @@
+export type BannerFitMode = 'fit' | 'fill' | 'stretch';
+
 export interface LinkItem {
   id: string;
   title: string;
@@ -18,9 +20,12 @@ export interface ImageBannerItem {
   title: string;
   slug: string;
   imageUrl: string;
+  originalImageUrl?: string;
   contentType: string;
   dimensions?: string;
   aspectRatio?: string;
+  fitMode?: BannerFitMode;
+  bgColor?: string;
   fileSize?: string;
   createdAt: string;
   updatedAt: string;
@@ -49,9 +54,34 @@ export interface ClickLog {
   isUnique: boolean;
 }
 
+export interface SourceStat {
+  name: string;
+  count: number;
+  unique: number;
+  percentage: number;
+}
+
+export interface HourlyStat {
+  hour: string;
+  count: number;
+}
+
+export interface AnalyticsData {
+  totalClicks: number;
+  uniqueClicks: number;
+  totalBannerViews: number;
+  clicks24h: number;
+  clicks7d: number;
+  activeLinksCount: number;
+  activeBannersCount: number;
+  sources: SourceStat[];
+  devices: Record<string, number>;
+  hourlyTrend: HourlyStat[];
+}
+
 export interface DatabaseSchema {
   links: LinkItem[];
   images: ImageBannerItem[];
   logs: ClickLog[];
-  ipSeen: Record<string, string[]>; // linkId -> array of IP hashes
+  ipSeen: Record<string, string[]>;
 }

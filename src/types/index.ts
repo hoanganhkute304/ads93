@@ -1,3 +1,5 @@
+export type BannerFitMode = 'fit' | 'fill' | 'stretch';
+
 export interface LinkItem {
   id: string;
   title: string;
@@ -18,9 +20,12 @@ export interface ImageBannerItem {
   title: string;
   slug: string;
   imageUrl: string;
+  originalImageUrl?: string;
   contentType: string;
   dimensions?: string;
   aspectRatio?: string;
+  fitMode?: BannerFitMode;
+  bgColor?: string;
   fileSize?: string;
   createdAt: string;
   updatedAt: string;
@@ -72,4 +77,11 @@ export interface AnalyticsData {
   sources: SourceStat[];
   devices: Record<string, number>;
   hourlyTrend: HourlyStat[];
+}
+
+export interface DatabaseSchema {
+  links: LinkItem[];
+  images: ImageBannerItem[];
+  logs: ClickLog[];
+  ipSeen: Record<string, string[]>;
 }

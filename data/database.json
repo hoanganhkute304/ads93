@@ -19,6 +19,36 @@
   ],
   "images": [
     {
+      "id": "img_1792512894368_jtv3",
+      "title": "image (1)",
+      "slug": "image--1-",
+      "imageUrl": "/uploads/image__1__1792512878204.jpg",
+      "contentType": "image/jpeg",
+      "dimensions": "1200x630",
+      "fileSize": "Tự động",
+      "createdAt": "2026-10-20T16:14:54.368Z",
+      "updatedAt": "2026-10-20T16:14:54.368Z",
+      "viewsCount": 1,
+      "isActive": true,
+      "targetLinkSlug": "",
+      "notes": ""
+    },
+    {
+      "id": "img_1792512752128_gcme",
+      "title": "555",
+      "slug": "103776512_p0-photoroom",
+      "imageUrl": "/uploads/103776512_p0-Photoroom_1792512735676.png",
+      "contentType": "image/png",
+      "dimensions": "1200x630",
+      "fileSize": "Tự động",
+      "createdAt": "2026-10-20T16:12:32.128Z",
+      "updatedAt": "2026-10-20T16:12:32.128Z",
+      "viewsCount": 11,
+      "isActive": true,
+      "targetLinkSlug": "",
+      "notes": ""
+    },
+    {
       "id": "img_1792434346959_55co",
       "title": "103776512_p0-Photoroom",
       "slug": "1233",
