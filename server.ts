@@ -74,6 +74,35 @@ if (fs.existsSync(firebaseConfigFile)) {
   }
 }
 
+// Tìm file thực tế trong thư mục data/uploads kể cả khi URL thiếu đuôi (.png, .gif, .jpg)
+function resolveUploadFilePath(requestedName: string): string | null {
+  const cleanName = path.basename(requestedName);
+  const directPath = path.join(UPLOADS_DIR, cleanName);
+  if (fs.existsSync(directPath) && fs.statSync(directPath).isFile()) {
+    return directPath;
+  }
+
+  const exts = ['.png', '.gif', '.jpg', '.jpeg', '.webp', '.svg'];
+  for (const ext of exts) {
+    const candidate = path.join(UPLOADS_DIR, `${cleanName}${ext}`);
+    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+      return candidate;
+    }
+  }
+
+  // Tìm file có tiền tố khớp (VD: 12345_...)
+  try {
+    const files = fs.readdirSync(UPLOADS_DIR);
+    const matched = files.find(
+      f => f.toLowerCase() === cleanName.toLowerCase() ||
+           f.toLowerCase().startsWith(cleanName.toLowerCase() + '.')
+    );
+    if (matched) return path.join(UPLOADS_DIR, matched);
+  } catch {}
+
+  return null;
+}
+
 function parseSource(req: Request): { source: string; utmSource?: string; utmMedium?: string; utmCampaign?: string; referrer?: string } {
   const query = req.query as Record<string, string>;
   const utmSource = query.utm_source;
@@ -82,12 +111,8 @@ function parseSource(req: Request): { source: string; utmSource?: string; utmMed
   const customSrc = query.src || query.source || query.ref;
   const referer = (req.headers['referer'] || req.headers['referrer'] || '') as string;
 
-  if (utmSource) {
-    return { source: utmSource, utmSource, utmMedium, utmCampaign };
-  }
-  if (customSrc) {
-    return { source: customSrc, utmSource: customSrc, utmMedium, utmCampaign };
-  }
+  if (utmSource) return { source: utmSource, utmSource, utmMedium, utmCampaign };
+  if (customSrc) return { source: customSrc, utmSource: customSrc, utmMedium, utmCampaign };
   if (referer) {
     const lowerRef = referer.toLowerCase();
     if (lowerRef.includes('tiktok.com') || lowerRef.includes('musical.ly')) return { source: 'TikTok', referrer: referer };
@@ -117,9 +142,7 @@ function parseSource(req: Request): { source: string; utmSource?: string; utmMed
 function parseDevice(userAgent: string): 'Mobile' | 'Desktop' | 'Tablet' | 'Other' {
   if (!userAgent) return 'Desktop';
   const ua = userAgent.toLowerCase();
-  if (/(tablet|ipad|playbook|silk)|(android(?!.*mobile))/i.test(ua)) {
-    return 'Tablet';
-  }
+  if (/(tablet|ipad|playbook|silk)|(android(?!.*mobile))/i.test(ua)) return 'Tablet';
   if (/(android|bb\d+|meego).+mobile|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od)|iris|kindle|lge |maemo|midp|mmp|mobile.+firefox|netfront|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|series(4|6)0|symbian|treo|up\.(browser|link)|vodafone|wap|windows ce|xda|xiino/i.test(ua)) {
     return 'Mobile';
   }
@@ -150,8 +173,34 @@ function parseBrowser(userAgent: string): { browser: string; os: string } {
 
 async function startServer() {
   const app = express();
-  app.use(express.json({ limit: '35mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '35mb' }));
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+  // Phục vụ thông minh cho route /uploads/:filename (Hỗ trợ cả khi không gõ đuôi .png/.gif hoặc dùng mã slug)
+  app.get('/uploads/:filename', (req: Request, res: Response) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+
+    const rawName = req.params.filename;
+    const foundFile = resolveUploadFilePath(rawName);
+    if (foundFile) {
+      return res.sendFile(foundFile);
+    }
+
+    // Nếu người dùng gõ /uploads/12345 mà 12345 là slug của banner, trả về ảnh của banner đó
+    const slug = rawName.replace(/\.[^/.]+$/, '').toLowerCase();
+    const banner = liveImages.get(slug) || db.getImageBySlug(slug);
+    if (banner && banner.imageUrl) {
+      if (banner.imageUrl.startsWith('/uploads/')) {
+        const bannerFile = resolveUploadFilePath(banner.imageUrl);
+        if (bannerFile) return res.sendFile(bannerFile);
+      }
+      return res.redirect(banner.imageUrl);
+    }
+
+    return res.status(404).send('Not found');
+  });
+
   app.use('/uploads', express.static(UPLOADS_DIR, {
     setHeaders: (res) => {
       res.setHeader('Access-Control-Allow-Origin', '*');
@@ -179,13 +228,8 @@ async function startServer() {
       }
     }
 
-    if (!link) {
-      link = db.getLinkBySlug(slug);
-    }
-
-    if (!link || link.isActive === false) {
-      return res.redirect(302, '/');
-    }
+    if (!link) link = db.getLinkBySlug(slug);
+    if (!link || link.isActive === false) return res.redirect(302, '/');
 
     const userAgent = (req.headers['user-agent'] || '') as string;
     const referrer = (req.headers['referer'] || req.headers['referrer'] || '') as string;
@@ -213,14 +257,14 @@ async function startServer() {
         os,
         ip: ip.replace(/\.\d+$/, '.xxx'),
         isUnique: true
-      }).catch(err => console.error('Failed to write click log to Firestore:', err));
+      }).catch(() => {});
 
       if (link.id) {
         updateDoc(doc(firestoreDb, 'links', link.id), {
           totalClicks: increment(1),
           uniqueClicks: increment(1),
           lastClickedAt: timestamp
-        }).catch(err => console.error('Failed to update totalClicks in Firestore:', err));
+        }).catch(() => {});
       }
     }
 
@@ -240,13 +284,8 @@ async function startServer() {
     } catch {}
 
     let finalUrl = (link.destinationUrl || '').trim();
-    if (!finalUrl) {
-      return res.redirect(302, '/');
-    }
-
-    if (!/^https?:\/\//i.test(finalUrl)) {
-      finalUrl = 'https://' + finalUrl;
-    }
+    if (!finalUrl) return res.redirect(302, '/');
+    if (!/^https?:\/\//i.test(finalUrl)) finalUrl = 'https://' + finalUrl;
 
     const queryEntries = Object.entries(req.query);
     if (queryEntries.length > 0) {
@@ -271,13 +310,12 @@ async function startServer() {
   // --- IMAGE BANNER ROUTE: /image/:slug ---
   app.get('/image/:slug', async (req: Request, res: Response) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
-    // Tắt cache để mỗi khi đổi tỉ lệ (VD: 9:16 -> 16:9 Fill) ảnh cập nhật ngay lập tức
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
 
     const rawSlug = req.params.slug;
-    const slug = rawSlug.trim().toLowerCase();
+    const slug = rawSlug.trim().toLowerCase().replace(/\.[^/.]+$/, '');
 
     let banner = liveImages.get(slug);
 
@@ -294,11 +332,15 @@ async function startServer() {
       }
     }
 
-    if (!banner) {
-      banner = db.getImageBySlug(slug);
-    }
+    if (!banner) banner = db.getImageBySlug(slug);
 
     if (!banner) {
+      // Thử kiểm tra xem có file trực tiếp trong /uploads trùng tên slug không
+      const fallbackUpload = resolveUploadFilePath(rawSlug);
+      if (fallbackUpload) {
+        return res.sendFile(fallbackUpload);
+      }
+
       res.setHeader('Content-Type', 'image/svg+xml');
       return res.status(404).send(`
         <svg xmlns="http://www.w3.org/2000/svg" width="600" height="300" viewBox="0 0 600 300">
@@ -323,10 +365,9 @@ async function startServer() {
     const imageUrl = banner.imageUrl;
 
     if (imageUrl.startsWith('/uploads/') || imageUrl.startsWith('uploads/')) {
-      const cleanPath = imageUrl.startsWith('/') ? imageUrl.slice(1) : imageUrl;
-      const localFilePath = path.resolve(process.cwd(), 'data', cleanPath);
-      if (fs.existsSync(localFilePath)) {
-        return res.sendFile(localFilePath);
+      const found = resolveUploadFilePath(imageUrl);
+      if (found) {
+        return res.sendFile(found);
       }
     }
 
@@ -340,6 +381,15 @@ async function startServer() {
     }
 
     if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      // Nếu là URL trỏ về chính /uploads/ của localhost, phục vụ trực tiếp từ ổ cứng
+      try {
+        const parsedUrl = new URL(imageUrl);
+        if (parsedUrl.pathname.startsWith('/uploads/')) {
+          const localFound = resolveUploadFilePath(parsedUrl.pathname);
+          if (localFound) return res.sendFile(localFound);
+        }
+      } catch {}
+
       try {
         const response = await fetch(imageUrl, {
           headers: {
@@ -368,6 +418,14 @@ async function startServer() {
     const targetUrl = req.query.url as string;
     if (!targetUrl) return res.status(400).send('Missing url');
     try {
+      const parsed = new URL(targetUrl);
+      if (parsed.pathname.startsWith('/uploads/')) {
+        const localFile = resolveUploadFilePath(parsed.pathname);
+        if (localFile) return res.sendFile(localFile);
+      }
+    } catch {}
+
+    try {
       const response = await fetch(targetUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -380,7 +438,7 @@ async function startServer() {
       res.setHeader('Access-Control-Allow-Origin', '*');
       const arrayBuffer = await response.arrayBuffer();
       return res.send(Buffer.from(arrayBuffer));
-    } catch (e) {
+    } catch {
       return res.status(500).send('Proxy error');
     }
   });
@@ -388,7 +446,7 @@ async function startServer() {
   // Upload API
   app.post('/api/upload', (req: Request, res: Response) => {
     try {
-      const { filename, data } = req.body;
+      const { filename, data, exactName } = req.body;
       if (!data) {
         return res.status(400).json({ success: false, error: 'Thiếu dữ liệu ảnh' });
       }
@@ -399,9 +457,9 @@ async function startServer() {
 
       if (matches && matches.length === 3) {
         const mime = matches[1];
-        if (mime.includes('jpeg') || mime.includes('jpg')) ext = 'jpg';
+        if (mime.includes('gif')) ext = 'gif';
+        else if (mime.includes('jpeg') || mime.includes('jpg')) ext = 'jpg';
         else if (mime.includes('webp')) ext = 'webp';
-        else if (mime.includes('gif')) ext = 'gif';
         else if (mime.includes('svg')) ext = 'svg';
         buffer = Buffer.from(matches[2], 'base64');
       } else {
@@ -411,7 +469,7 @@ async function startServer() {
       const safeName = (filename || 'banner')
         .replace(/\.[^/.]+$/, '')
         .replace(/[^a-zA-Z0-9_-]/g, '_');
-      const finalFilename = `${safeName}_${Date.now()}.${ext}`;
+      const finalFilename = exactName ? `${safeName}.${ext}` : `${safeName}_${Date.now()}.${ext}`;
       const filePath = path.join(UPLOADS_DIR, finalFilename);
 
       fs.writeFileSync(filePath, buffer);
@@ -428,6 +486,46 @@ async function startServer() {
     } catch (err: any) {
       console.error('Upload error:', err);
       res.status(500).json({ success: false, error: err.message || 'Lỗi khi lưu ảnh' });
+    }
+  });
+
+  // API Đổi tên file / đường dẫn ảnh (VD: từ /uploads/123 sang /uploads/12345 hoặc /image/12345)
+  app.post('/api/rename-banner-link', (req: Request, res: Response) => {
+    try {
+      const { currentImageUrl, currentOriginalUrl, newName } = req.body;
+      const cleanNewName = String(newName || '')
+        .trim()
+        .replace(/^.*\/(uploads|image)\//i, '')
+        .replace(/\.[^/.]+$/, '')
+        .replace(/[^a-zA-Z0-9_-]/g, '-');
+
+      if (!cleanNewName) {
+        return res.status(400).json({ success: false, error: 'Tên đường dẫn mới không hợp lệ' });
+      }
+
+      let finalImageUrl = currentImageUrl;
+      let finalOriginalUrl = currentOriginalUrl || currentImageUrl;
+
+      // Sao chép file trong /uploads sang tên mới để cả /uploads/<newName> và /image/<newName> đều hoạt động
+      const existingFile = resolveUploadFilePath(currentImageUrl || '') || resolveUploadFilePath(currentOriginalUrl || '');
+      if (existingFile) {
+        const ext = path.extname(existingFile) || '.png';
+        const newFileName = `${cleanNewName}${ext}`;
+        const newFilePath = path.join(UPLOADS_DIR, newFileName);
+        if (existingFile !== newFilePath) {
+          fs.copyFileSync(existingFile, newFilePath);
+        }
+        finalImageUrl = `/uploads/${newFileName}`;
+      }
+
+      return res.json({
+        success: true,
+        newSlug: cleanNewName.toLowerCase(),
+        newImageUrl: finalImageUrl,
+        newOriginalUrl: finalOriginalUrl
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message || 'Lỗi đổi tên link ảnh' });
     }
   });
 
@@ -538,36 +636,40 @@ async function startServer() {
 
   app.put('/api/images/:id', async (req: Request, res: Response) => {
     try {
-      let updated: any = null;
-      try {
-        updated = db.updateImage(req.params.id, req.body);
-      } catch {
-        updated = { id: req.params.id, ...req.body };
+      const id = req.params.id;
+      let existingInMem: any = null;
+      let oldSlugKey: string | null = null;
+
+      for (const [k, v] of liveImages.entries()) {
+        if (v.id === id) {
+          existingInMem = v;
+          oldSlugKey = k;
+          break;
+        }
       }
 
-      if (req.body.slug) {
-        const existing = liveImages.get(req.body.slug.toLowerCase()) || {};
-        liveImages.set(req.body.slug.toLowerCase(), { ...existing, ...updated, ...req.body });
+      let updated: any = null;
+      try {
+        updated = db.updateImage(id, req.body);
+      } catch {
+        updated = { ...(existingInMem || {}), id, ...req.body };
+      }
+
+      const finalSlug = (req.body.slug || updated.slug || '').toLowerCase();
+      if (oldSlugKey && finalSlug && oldSlugKey !== finalSlug) {
+        liveImages.delete(oldSlugKey);
+      }
+      if (finalSlug) {
+        liveImages.set(finalSlug, { ...(existingInMem || {}), ...updated, ...req.body });
       }
 
       if (firestoreDb) {
         try {
-          await updateDoc(doc(firestoreDb, 'images', req.params.id), {
+          await updateDoc(doc(firestoreDb, 'images', id), {
             ...req.body,
             updatedAt: new Date().toISOString()
           });
-        } catch {
-          if (req.body.slug) {
-            const q = query(collection(firestoreDb, 'images'), where('slug', '==', req.body.slug.toLowerCase()));
-            const snap = await getDocs(q);
-            if (!snap.empty) {
-              await updateDoc(snap.docs[0].ref, {
-                ...req.body,
-                updatedAt: new Date().toISOString()
-              });
-            }
-          }
-        }
+        } catch {}
       }
 
       res.json({ success: true, data: updated });
@@ -613,32 +715,6 @@ async function startServer() {
     const linkSlug = req.query.slug as string;
     const source = req.query.source as string;
     res.json({ success: true, data: db.getLogs(limit, linkSlug, source) });
-  });
-
-  app.post('/api/test-click', (req: Request, res: Response) => {
-    const { slug, source = 'TikTok Ads', device = 'Mobile' } = req.body;
-    const cleanSlug = (slug || '').toLowerCase();
-    const link = liveLinks.get(cleanSlug) || db.getLinkBySlug(cleanSlug);
-    if (!link) {
-      return res.status(404).json({ success: false, error: 'Link không tồn tại' });
-    }
-
-    const log = db.recordClick(link, {
-      source,
-      referrer: source === 'Direct' ? '' : `https://m.${source.toLowerCase().replace(/\s+/g, '')}.com/`,
-      userAgent: `Test-Agent (${device}) ADS93-Simulator/1.0`,
-      device,
-      browser: 'Simulator',
-      os: 'Simulated OS',
-      ip: `113.160.${Math.floor(Math.random() * 200)}.${Math.floor(Math.random() * 250)}`
-    });
-
-    res.json({ success: true, data: log, link });
-  });
-
-  app.post('/api/reset', (_req: Request, res: Response) => {
-    db.resetSeed();
-    res.json({ success: true, message: 'Khôi phục dữ liệu thành công' });
   });
 
   if (!isProd) {

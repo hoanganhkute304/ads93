@@ -26,6 +26,13 @@ export interface ImageBannerItem {
   aspectRatio?: string;
   fitMode?: BannerFitMode;
   bgColor?: string;
+  rotation?: number;
+  flipH?: boolean;
+  flipV?: boolean;
+  offsetX?: number;
+  offsetY?: number;
+  scale?: number;
+  opacity?: number;
   fileSize?: string;
   createdAt: string;
   updatedAt: string;

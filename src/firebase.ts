@@ -104,6 +104,12 @@ export function subscribeBanners(onUpdate: (banners: ImageBannerItem[]) => void,
           aspectRatio: data.aspectRatio || '16:9',
           fitMode: (data.fitMode as BannerFitMode) || 'fit',
           bgColor: data.bgColor || '#ffffff',
+          rotation: data.rotation || 0,
+          flipH: !!data.flipH,
+          flipV: !!data.flipV,
+          offsetY: data.offsetY || 0,
+          scale: data.scale !== undefined ? data.scale : 1.0,
+          opacity: data.opacity !== undefined ? data.opacity : 1.0,
           fileSize: data.fileSize,
           createdAt: data.createdAt || new Date().toISOString(),
           updatedAt: data.updatedAt || new Date().toISOString(),
@@ -214,6 +220,12 @@ export async function addBannerToFirestore(payload: {
   aspectRatio?: string;
   fitMode?: BannerFitMode;
   bgColor?: string;
+  rotation?: number;
+  flipH?: boolean;
+  flipV?: boolean;
+  offsetY?: number;
+  scale?: number;
+  opacity?: number;
   fileSize?: string;
   targetLinkSlug?: string;
   notes?: string;
@@ -226,11 +238,17 @@ export async function addBannerToFirestore(payload: {
     slug: cleanSlug,
     imageUrl: payload.imageUrl.trim(),
     originalImageUrl: (payload.originalImageUrl || payload.imageUrl).trim(),
-    contentType: 'image/png',
+    contentType: payload.imageUrl.endsWith('.gif') ? 'image/gif' : 'image/png',
     dimensions: payload.dimensions || '1600x900',
     aspectRatio: payload.aspectRatio || '16:9',
     fitMode: payload.fitMode || 'fit',
     bgColor: payload.bgColor || '#ffffff',
+    rotation: payload.rotation || 0,
+    flipH: !!payload.flipH,
+    flipV: !!payload.flipV,
+    offsetY: payload.offsetY || 0,
+    scale: payload.scale !== undefined ? payload.scale : 1.0,
+    opacity: payload.opacity !== undefined ? payload.opacity : 1.0,
     fileSize: payload.fileSize || 'Auto',
     createdAt: now,
     updatedAt: now,
