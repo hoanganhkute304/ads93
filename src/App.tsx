@@ -85,7 +85,23 @@ const FIT_MODES: { id: BannerFitMode; label: string }[] = [
 ];
 
 /**
- * Bộ nén GIF89a trực tiếp trên trình duyệt (Hỗ trợ nền trong suốt & nền màu cho ảnh động GIF)
+ * Hàm đọc JSON an toàn, không bao giờ gây lỗi "Unexpected end of JSON input"
+ */
+async function safeFetchJson(url: string, options?: RequestInit): Promise<any> {
+  const res = await fetch(url, options);
+  const text = await res.text();
+  if (!text || !text.trim()) {
+    throw new Error(`Máy chủ trả về phản hồi rỗng (HTTP ${res.status}). Hãy khởi động lại lệnh npm run dev.`);
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Phản hồi không đúng định dạng JSON (HTTP ${res.status}).`);
+  }
+}
+
+/**
+ * Bộ nén GIF89a trực tiếp trên trình duyệt (Hỗ trợ Có nền & Không nền cho ảnh động GIF)
  */
 function encodeAnimatedGif(
   frames: { data: Uint8ClampedArray; delayMs: number }[],
@@ -101,15 +117,13 @@ function encodeAnimatedGif(
     for (let i = 0; i < str.length; i++) bytes.push(str.charCodeAt(i));
   };
 
-  // Header GIF89a
   writeAscii('GIF89a');
   writeShort(width);
   writeShort(height);
-  writeByte(0xf7); // Global Color Table Flag = 1, 256 colors
-  writeByte(255);  // Background Color Index
+  writeByte(0xf7);
+  writeByte(255);
   writeByte(0);
 
-  // Global Color Table: 216 màu (6x6x6 RGB cube) + 39 mức xám + Index 255 cho Transparent
   for (let r = 0; r < 6; r++) {
     for (let g = 0; g < 6; g++) {
       for (let b = 0; b < 6; b++) {
@@ -126,7 +140,6 @@ function encodeAnimatedGif(
     writeByte(v);
   }
 
-  // Netscape 2.0 Extension để lặp vô hạn
   writeByte(0x21);
   writeByte(0xff);
   writeByte(0x0b);
@@ -146,7 +159,7 @@ function encodeAnimatedGif(
       const idx = i * 4;
       const a = rgba[idx + 3];
       if (a < 128) {
-        indexedPixels[i] = 255; // Trong suốt
+        indexedPixels[i] = 255;
       } else {
         const r = Math.round((rgba[idx] * 5) / 255);
         const g = Math.round((rgba[idx + 1] * 5) / 255);
@@ -155,17 +168,15 @@ function encodeAnimatedGif(
       }
     }
 
-    // Graphic Control Extension (Disposal = 2: Xóa khung trước để hỗ trợ không nền/trong suốt)
     const delayCs = Math.max(2, Math.round((frame.delayMs || 80) / 10));
     writeByte(0x21);
     writeByte(0xf9);
     writeByte(0x04);
-    writeByte(0x09); // Disposal = 2 (Restore to bg), Transparent Flag = 1
+    writeByte(0x09);
     writeShort(delayCs);
-    writeByte(255);  // Transparent Color Index = 255
+    writeByte(255);
     writeByte(0x00);
 
-    // Image Descriptor
     writeByte(0x2c);
     writeShort(0);
     writeShort(0);
@@ -173,7 +184,6 @@ function encodeAnimatedGif(
     writeShort(height);
     writeByte(0x00);
 
-    // LZW Compression
     const minCodeSize = 8;
     writeByte(minCodeSize);
 
@@ -240,10 +250,10 @@ function encodeAnimatedGif(
       subBlock.push(bitBuf & 0xff);
     }
     flushSubBlock();
-    writeByte(0x00); // Block Terminator
+    writeByte(0x00);
   }
 
-  writeByte(0x3b); // GIF Trailer
+  writeByte(0x3b);
 
   let binary = '';
   const chunkSize = 8192;
@@ -254,7 +264,7 @@ function encodeAnimatedGif(
 }
 
 /**
- * Giải mã các khung hình (frames) của ảnh động GIF bằng ImageDecoder
+ * Giải mã các khung hình của ảnh động GIF
  */
 async function decodeGifFrames(url: string): Promise<{ canvas: HTMLCanvasElement; delayMs: number }[] | null> {
   if (typeof (window as any).ImageDecoder === 'undefined') return null;
@@ -276,7 +286,7 @@ async function decodeGifFrames(url: string): Promise<{ canvas: HTMLCanvasElement
       return null;
     }
 
-    const maxFrames = 36;
+    const maxFrames = 32;
     const step = frameCount > maxFrames ? frameCount / maxFrames : 1;
     const decodedFrames: { canvas: HTMLCanvasElement; delayMs: number }[] = [];
 
@@ -284,8 +294,8 @@ async function decodeGifFrames(url: string): Promise<{ canvas: HTMLCanvasElement
       if (i >= frameCount) break;
       const result = await decoder.decode({ frameIndex: i });
       const vf = result.image;
-      const w = vf.displayWidth || vf.codedWidth || 600;
-      const h = vf.displayHeight || vf.codedHeight || 600;
+      const w = vf.displayWidth || vf.codedWidth || 500;
+      const h = vf.displayHeight || vf.codedHeight || 500;
       const c = document.createElement('canvas');
       c.width = w;
       c.height = h;
@@ -303,10 +313,7 @@ async function decodeGifFrames(url: string): Promise<{ canvas: HTMLCanvasElement
   }
 }
 
-/**
- * Tính toán kích thước chuẩn (Width x Height) theo tỉ lệ đã chọn
- */
-function computeTargetDimensions(srcW: number, srcH: number, ratioId: string, baseSize = 1400): { width: number; height: number } {
+function computeTargetDimensions(srcW: number, srcH: number, ratioId: string, baseSize = 1200): { width: number; height: number } {
   const ratioObj = ASPECT_RATIOS.find(r => r.id === ratioId);
   if (!ratioObj || ratioObj.ratio === 'auto') {
     const maxDim = Math.max(srcW || 1200, srcH || 630);
@@ -334,10 +341,6 @@ function computeTargetDimensions(srcW: number, srcH: number, ratioId: string, ba
   return { width: 1200, height: 675 };
 }
 
-/**
- * Hàm vẽ ảnh chuẩn xác dùng chung cho CẢ khung Preview và lúc Lưu xuất file lên Web.
- * Hỗ trợ Có nền (Solid Color) & Không nền (Transparent).
- */
 function drawBannerToCanvas(
   canvas: HTMLCanvasElement,
   source: HTMLImageElement | HTMLCanvasElement,
@@ -353,7 +356,7 @@ function drawBannerToCanvas(
     scale: number;
     opacity: number;
   },
-  baseResolution = 1400
+  baseResolution = 1200
 ): { width: number; height: number } {
   const srcW = (source as HTMLImageElement).naturalWidth || source.width || 1200;
   const srcH = (source as HTMLImageElement).naturalHeight || source.height || 630;
@@ -372,7 +375,7 @@ function drawBannerToCanvas(
 
   ctx.clearRect(0, 0, targetW, targetH);
 
-  // 1. Đổ màu nền nếu chọn "Có nền" (Nếu chọn "Không nền" / transparent thì giữ nguyên trong suốt)
+  // Đổ màu nền nếu chọn "Có nền" (Nếu chọn "transparent" / Không nền thì giữ nguyên trong suốt)
   if (params.bgColor && params.bgColor !== 'transparent') {
     ctx.fillStyle = params.bgColor;
     ctx.fillRect(0, 0, targetW, targetH);
@@ -380,23 +383,19 @@ function drawBannerToCanvas(
 
   ctx.save();
 
-  // 2. Độ mờ (Opacity)
   const alpha = params.opacity !== undefined ? Math.max(0.05, Math.min(1, params.opacity)) : 1.0;
   ctx.globalAlpha = alpha;
 
-  // 3. Dịch chuyển tâm ảnh theo thanh trượt Ngang (offsetX) & Dọc (offsetY)
   const shiftX = ((params.offsetX || 0) / 100) * targetW;
   const shiftY = ((params.offsetY || 0) / 100) * targetH;
   ctx.translate(targetW / 2 + shiftX, targetH / 2 + shiftY);
 
-  // 4. Xoay & Lật gương & Phóng to (Zoom)
   if (params.rotation) {
     ctx.rotate((params.rotation * Math.PI) / 180);
   }
   const zoom = params.scale !== undefined ? params.scale : 1.0;
   ctx.scale((params.flipH ? -1 : 1) * zoom, (params.flipV ? -1 : 1) * zoom);
 
-  // 5. Tính toán kích thước vẽ theo chế độ Fit / Fill / Stretch
   let drawW = srcW;
   let drawH = srcH;
 
@@ -419,11 +418,6 @@ function drawBannerToCanvas(
   return { width: targetW, height: targetH };
 }
 
-/**
- * Component Khung Preview 1:1 (Vuông):
- * - Khung ngoài luôn cố định tỉ lệ 1:1.
- * - Bên trong hiển thị Canvas (cả ảnh tĩnh lẫn ảnh GIF động) đúng tỉ lệ, màu nền / không nền, xoay, lật, zoom.
- */
 interface SquareStagePreviewProps {
   srcUrl: string;
   ratioId: string;
@@ -463,7 +457,6 @@ const SquareStagePreview: React.FC<SquareStagePreviewProps> = ({
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
 
-  // Tải ảnh gốc (và giải mã các frame nếu là ảnh động GIF)
   useEffect(() => {
     if (!srcUrl) {
       setImgStatus('error');
@@ -523,7 +516,6 @@ const SquareStagePreview: React.FC<SquareStagePreviewProps> = ({
     };
   }, [srcUrl, origin]);
 
-  // Vẽ lên Canvas (Nếu là GIF nhiều frame thì chạy vòng lặp animation mượt mà kèm đầy đủ hiệu ứng)
   useEffect(() => {
     if (imgStatus !== 'loaded' || !canvasRef.current) return;
 
@@ -549,7 +541,7 @@ const SquareStagePreview: React.FC<SquareStagePreviewProps> = ({
       const renderNextFrame = () => {
         if (!active || !canvasRef.current) return;
         const current = frames[frameIdx];
-        const dims = drawBannerToCanvas(canvasRef.current, current.canvas, params, 700);
+        const dims = drawBannerToCanvas(canvasRef.current, current.canvas, params, 650);
         if (frameIdx === 0) setCanvasDims(dims);
         frameIdx = (frameIdx + 1) % frames.length;
         timerId = setTimeout(renderNextFrame, current.delayMs || 80);
@@ -561,7 +553,7 @@ const SquareStagePreview: React.FC<SquareStagePreviewProps> = ({
         if (timerId) clearTimeout(timerId);
       };
     } else if (loadedImgRef.current) {
-      const dims = drawBannerToCanvas(canvasRef.current, loadedImgRef.current, params, 900);
+      const dims = drawBannerToCanvas(canvasRef.current, loadedImgRef.current, params, 850);
       setCanvasDims(dims);
     }
   }, [imgStatus, ratioId, fitMode, bgColor, rotation, flipH, flipV, offsetX, offsetY, scale, opacity]);
@@ -635,9 +627,6 @@ const SquareStagePreview: React.FC<SquareStagePreviewProps> = ({
   );
 };
 
-/**
- * Thanh trượt thiết kế mới: Mượt, gọn, có nút +/- và bấm Reset nhanh
- */
 interface ModernSliderProps {
   icon: React.ReactNode;
   label: string;
@@ -738,10 +727,13 @@ export default function App() {
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
 
+  // State sửa trực tiếp Tên, Slug (/link/123 -> /link/12345) và Link đích cho từng thẻ Link
+  const [editingLinkTitle, setEditingLinkTitle] = useState<Record<string, string>>({});
+  const [editingLinkSlug, setEditingLinkSlug] = useState<Record<string, string>>({});
   const [editingDest, setEditingDest] = useState<Record<string, string>>({});
   const [savingDestId, setSavingDestId] = useState<string | null>(null);
 
-  // State tinh chỉnh cục bộ trên từng thẻ Banner (Chưa lưu lên server cho tới khi bấm Lưu)
+  // State tinh chỉnh cục bộ trên từng thẻ Banner
   const [cardRatios, setCardRatios] = useState<Record<string, string>>({});
   const [cardFitModes, setCardFitModes] = useState<Record<string, BannerFitMode>>({});
   const [cardBgColors, setCardBgColors] = useState<Record<string, string>>({});
@@ -757,11 +749,10 @@ export default function App() {
   const [openToolsId, setOpenToolsId] = useState<string | null>(null);
   const [processingBannerId, setProcessingBannerId] = useState<string | null>(null);
 
-  // Hộp thoại Đổi Link / Đổi Đường Dẫn
   const [editingBannerImgId, setEditingBannerImgId] = useState<string | null>(null);
   const [tempBannerImgUrl, setTempBannerImgUrl] = useState<string>('');
+  const [tempBannerSlugInline, setTempBannerSlugInline] = useState<string>('');
 
-  // Modal sửa Tên & Slug của Banner
   const [editingBannerMeta, setEditingBannerMeta] = useState<ImageBannerItem | null>(null);
   const [tempBannerTitle, setTempBannerTitle] = useState('');
   const [tempBannerSlug, setTempBannerSlug] = useState('');
@@ -818,10 +809,16 @@ export default function App() {
   useEffect(() => {
     const unsubLinks = subscribeLinks(data => {
       setLinks(data);
+      const titleMap: Record<string, string> = {};
+      const slugMap: Record<string, string> = {};
       const destMap: Record<string, string> = {};
       data.forEach(l => {
+        titleMap[l.id] = l.title;
+        slugMap[l.id] = l.slug;
         destMap[l.id] = l.destinationUrl;
       });
+      setEditingLinkTitle(prev => ({ ...titleMap, ...prev }));
+      setEditingLinkSlug(prev => ({ ...slugMap, ...prev }));
       setEditingDest(prev => ({ ...destMap, ...prev }));
     });
 
@@ -895,6 +892,16 @@ export default function App() {
     return trimmed;
   };
 
+  const extractCleanSlug = (rawInput: string): string => {
+    return rawInput
+      .trim()
+      .replace(/^https?:\/\/[^/]+\/(link|image|uploads)\//i, '')
+      .replace(/^\/?(link|image|uploads)\//i, '')
+      .replace(/\.[^/.]+$/, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, '-');
+  };
+
   const uploadRawFileToServer = async (file: File): Promise<string> => {
     const reader = new FileReader();
     const base64Promise = new Promise<string>((resolve, reject) => {
@@ -904,19 +911,15 @@ export default function App() {
     reader.readAsDataURL(file);
     const base64Data = await base64Promise;
 
-    const res = await fetch('/api/upload', {
+    const json = await safeFetchJson('/api/upload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ filename: `raw_${file.name}`, data: base64Data })
     });
-    const json = await res.json();
     if (!json.success) throw new Error(json.error || 'Lỗi tải ảnh');
     return json.url;
   };
 
-  /**
-   * Xuất ảnh từ hàm drawBannerToCanvas (Hỗ trợ cả ảnh tĩnh PNG và ảnh động GIF nhiều frame!)
-   */
   const renderTransformedBannerToServer = async (
     sourceUrl: string,
     ratioId: string,
@@ -949,7 +952,6 @@ export default function App() {
       opacity
     };
 
-    // 1. Nếu là ảnh động GIF: giải mã từng frame -> vẽ qua drawBannerToCanvas -> nén lại thành GIF89a động!
     const isLikelyGif = sourceUrl.toLowerCase().includes('.gif') || sourceUrl.startsWith('data:image/gif');
     if (isLikelyGif) {
       const gifFrames = await decodeGifFrames(loadUrl);
@@ -957,11 +959,11 @@ export default function App() {
         try {
           const workCanvas = document.createElement('canvas');
           const encodedFrames: { data: Uint8ClampedArray; delayMs: number }[] = [];
-          let outW = 600;
-          let outH = 600;
+          let outW = 550;
+          let outH = 550;
 
           for (const gf of gifFrames) {
-            const dims = drawBannerToCanvas(workCanvas, gf.canvas, params, 600);
+            const dims = drawBannerToCanvas(workCanvas, gf.canvas, params, 550);
             outW = dims.width;
             outH = dims.height;
             const ctx = workCanvas.getContext('2d');
@@ -973,7 +975,7 @@ export default function App() {
 
           if (encodedFrames.length > 0) {
             const gifBase64 = encodeAnimatedGif(encodedFrames, outW, outH);
-            const res = await fetch('/api/upload', {
+            const json = await safeFetchJson('/api/upload', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -981,8 +983,7 @@ export default function App() {
                 data: gifBase64
               })
             });
-            const json = await res.json();
-            if (json.success) {
+            if (json.success && json.url) {
               return { url: json.url, dimensions: `${outW}x${outH}` };
             }
           }
@@ -992,7 +993,6 @@ export default function App() {
       }
     }
 
-    // 2. Xử lý ảnh tĩnh (PNG / JPG / WebP hoặc GIF 1 frame)
     return new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
@@ -1000,10 +1000,10 @@ export default function App() {
       img.onload = async () => {
         try {
           const canvas = document.createElement('canvas');
-          const { width, height } = drawBannerToCanvas(canvas, img, params, 1500);
+          const { width, height } = drawBannerToCanvas(canvas, img, params, 1200);
 
           const base64Data = canvas.toDataURL('image/png');
-          const res = await fetch('/api/upload', {
+          const json = await safeFetchJson('/api/upload', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1011,8 +1011,7 @@ export default function App() {
               data: base64Data
             })
           });
-          const json = await res.json();
-          if (!json.success) throw new Error(json.error || 'Upload error');
+          if (!json.success || !json.url) throw new Error(json.error || 'Upload error');
 
           resolve({
             url: json.url,
@@ -1070,23 +1069,56 @@ export default function App() {
     setCardOpacity(prev => ({ ...prev, [b.id]: b.opacity ?? 1.0 }));
   };
 
-  const handleSaveDestination = async (link: LinkItem) => {
-    const rawTarget = (editingDest[link.id] || '').trim();
-    if (!rawTarget) return;
+  /**
+   * Lưu thay đổi của Link (Cho phép đổi cả Tên, đường dẫn /link/123 -> /link/12345 và Link đích)
+   */
+  const handleSaveLinkChanges = async (link: LinkItem) => {
+    const rawTitle = (editingLinkTitle[link.id] !== undefined ? editingLinkTitle[link.id] : link.title).trim();
+    const rawSlug = editingLinkSlug[link.id] !== undefined ? editingLinkSlug[link.id] : link.slug;
+    const cleanSlug = extractCleanSlug(rawSlug);
+    const rawTarget = (editingDest[link.id] !== undefined ? editingDest[link.id] : link.destinationUrl).trim();
+
+    if (!cleanSlug || !rawTarget) {
+      notify('Vui lòng nhập đủ mã rút gọn (slug) và link đích');
+      return;
+    }
+
+    const conflict = links.find(l => l.id !== link.id && l.slug.toLowerCase() === cleanSlug);
+    if (conflict) {
+      notify(`Đường dẫn /link/${cleanSlug} đã tồn tại!`);
+      return;
+    }
+
     const newTarget = formatDestinationUrl(rawTarget);
+    const newTitle = rawTitle || cleanSlug;
 
     try {
       setSavingDestId(link.id);
-      await updateLinkInFirestore(link.id, { destinationUrl: newTarget });
-      await api.updateLink(link.id, {
-        title: link.title,
-        slug: link.slug,
-        destinationUrl: newTarget
-      }).catch(() => {});
+      const fullLinkPayload: Partial<LinkItem> = {
+        title: newTitle,
+        slug: cleanSlug,
+        destinationUrl: newTarget,
+        isActive: link.isActive !== false
+      };
+
+      await updateLinkInFirestore(link.id, fullLinkPayload);
+      await api.updateLink(link.id, { id: link.id, ...fullLinkPayload }).catch(() => {});
+
+      // Nếu người dùng đổi từ /link/123 sang /link/12345, đăng ký luôn vào backend db
+      if (cleanSlug !== link.slug) {
+        await api.createLink({
+          title: newTitle,
+          slug: cleanSlug,
+          destinationUrl: newTarget
+        }).catch(() => {});
+      }
+
+      setEditingLinkTitle(prev => ({ ...prev, [link.id]: newTitle }));
+      setEditingLinkSlug(prev => ({ ...prev, [link.id]: cleanSlug }));
       setEditingDest(prev => ({ ...prev, [link.id]: newTarget }));
-      notify('Đã cập nhật link đích');
+      notify(`Đã lưu /link/${cleanSlug}`);
     } catch (err: any) {
-      notify('Lỗi: ' + (err.message || 'Không thể lưu'));
+      notify('Lỗi: ' + (err.message || 'Không thể lưu link'));
     } finally {
       setSavingDestId(null);
     }
@@ -1094,7 +1126,7 @@ export default function App() {
 
   const handleCreateLink = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanSlug = newLinkSlug.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+    const cleanSlug = extractCleanSlug(newLinkSlug);
     if (!cleanSlug || !newLinkDest.trim()) return;
     const cleanDest = formatDestinationUrl(newLinkDest);
 
@@ -1141,7 +1173,7 @@ export default function App() {
 
   const handleCreateBanner = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanSlug = newBannerSlug.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+    const cleanSlug = extractCleanSlug(newBannerSlug);
     if (!cleanSlug || !newBannerRawUrl.trim()) return;
 
     try {
@@ -1209,10 +1241,11 @@ export default function App() {
     }
   };
 
-  const handleSaveBannerTransform = async (banner: ImageBannerItem, overrideRawUrl?: string) => {
+  const handleSaveBannerTransform = async (banner: ImageBannerItem, overrideRawUrl?: string, overrideSlug?: string) => {
     const sourceRawUrl = (overrideRawUrl || banner.originalImageUrl || banner.imageUrl || '').trim();
     if (!sourceRawUrl) return;
 
+    const finalSlug = overrideSlug ? extractCleanSlug(overrideSlug) : banner.slug;
     const nextRatio = cardRatios[banner.id] ?? (banner.aspectRatio || '16:9');
     const nextFitMode = cardFitModes[banner.id] ?? (banner.fitMode || 'fit');
     const nextBgColor = cardBgColors[banner.id] ?? (banner.bgColor || '#ffffff');
@@ -1238,12 +1271,12 @@ export default function App() {
         nextOffsetY,
         nextScale,
         nextOpacity,
-        banner.slug
+        finalSlug
       );
 
       const fullUpdates: Partial<ImageBannerItem> = {
         title: banner.title,
-        slug: banner.slug,
+        slug: finalSlug,
         imageUrl: rendered.url,
         originalImageUrl: sourceRawUrl,
         aspectRatio: nextRatio,
@@ -1260,8 +1293,16 @@ export default function App() {
 
       await updateBannerInFirestore(banner.id, fullUpdates);
       await api.updateImage(banner.id, fullUpdates).catch(() => {});
+      if (finalSlug !== banner.slug) {
+        await api.createImage({
+          title: banner.title,
+          slug: finalSlug,
+          imageUrl: rendered.url,
+          dimensions: rendered.dimensions
+        }).catch(() => {});
+      }
 
-      notify(`Đã lưu & xuất ảnh /image/${banner.slug}`);
+      notify(`Đã lưu & cập nhật /image/${finalSlug}`);
     } catch (err: any) {
       notify('Lỗi xử lý ảnh: ' + (err.message || 'Không thể cập nhật'));
     } finally {
@@ -1270,41 +1311,48 @@ export default function App() {
   };
 
   /**
-   * Sửa Tên & Mã đường dẫn (/image/slug hoặc /uploads/slug) mà KHÔNG làm mất ảnh
+   * Đổi tên & Đường dẫn ảnh (/image/123 -> /image/12345) bằng Firestore + API chuẩn (Không cần route phụ, không mất ảnh)
    */
   const handleSaveBannerMeta = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingBannerMeta) return;
-    const cleanSlug = tempBannerSlug.trim().toLowerCase().replace(/^.*\/(image|uploads)\//i, '').replace(/\.[^/.]+$/, '').replace(/[^a-z0-9_-]/g, '-');
+    const cleanSlug = extractCleanSlug(tempBannerSlug);
     if (!cleanSlug) return;
 
+    const conflict = banners.find(b => b.id !== editingBannerMeta.id && b.slug.toLowerCase() === cleanSlug);
+    if (conflict) {
+      notify(`Đường dẫn /image/${cleanSlug} đã tồn tại!`);
+      return;
+    }
+
     try {
-      // Đồng bộ đổi tên file trên server để cả /uploads/<cleanSlug> và /image/<cleanSlug> đều có hiệu lực
-      const renameRes = await fetch('/api/rename-banner-link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          currentImageUrl: editingBannerMeta.imageUrl,
-          currentOriginalUrl: editingBannerMeta.originalImageUrl || editingBannerMeta.imageUrl,
-          newName: cleanSlug
-        })
-      }).then(r => r.json()).catch(() => null);
-
-      const updatedImageUrl = renameRes?.success ? renameRes.newImageUrl : editingBannerMeta.imageUrl;
-
       const fullPayload: Partial<ImageBannerItem> = {
         title: tempBannerTitle.trim() || cleanSlug,
         slug: cleanSlug,
-        imageUrl: updatedImageUrl,
+        imageUrl: editingBannerMeta.imageUrl,
         originalImageUrl: editingBannerMeta.originalImageUrl || editingBannerMeta.imageUrl,
         aspectRatio: editingBannerMeta.aspectRatio || '16:9',
         fitMode: editingBannerMeta.fitMode || 'fit',
         bgColor: editingBannerMeta.bgColor || '#ffffff',
-        dimensions: editingBannerMeta.dimensions || '1600x900'
+        rotation: editingBannerMeta.rotation || 0,
+        flipH: !!editingBannerMeta.flipH,
+        flipV: !!editingBannerMeta.flipV,
+        offsetY: editingBannerMeta.offsetY || 0,
+        scale: editingBannerMeta.scale ?? 1.0,
+        opacity: editingBannerMeta.opacity ?? 1.0,
+        dimensions: editingBannerMeta.dimensions || '1200x675'
       };
 
       await updateBannerInFirestore(editingBannerMeta.id, fullPayload);
       await api.updateImage(editingBannerMeta.id, fullPayload).catch(() => {});
+      if (cleanSlug !== editingBannerMeta.slug) {
+        await api.createImage({
+          title: fullPayload.title!,
+          slug: cleanSlug,
+          imageUrl: fullPayload.imageUrl!,
+          dimensions: fullPayload.dimensions
+        }).catch(() => {});
+      }
 
       notify(`Đã đổi đường dẫn thành /image/${cleanSlug}`);
       setEditingBannerMeta(null);
@@ -1330,64 +1378,76 @@ export default function App() {
   };
 
   /**
-   * Xử lý thông minh khi người dùng bấm "Đổi link":
-   * - Nếu người dùng sửa link nội bộ (VD: từ http://localhost:3000/uploads/123 sang http://localhost:3000/uploads/12345 hoặc /image/12345),
-   *   hệ thống tự hiểu là ĐỔI TÊN ĐƯỜNG DẪN của ảnh hiện tại (copy sang file 12345) chứ không tải lại gây lỗi!
-   * - Chỉ khi người dùng dán một URL ảnh từ trang web bên ngoài (VD: https://imgur.com/abc.png) thì mới tải ảnh mới đó về.
+   * Lưu hộp thoại "Đổi link" bên dưới thẻ Banner:
+   * - Cho phép đổi mã đường dẫn `/image/123` -> `/image/12345` (hoặc gõ `http://localhost:3000/uploads/12345`) mà không mất ảnh!
+   * - Hoặc dán link ảnh từ trang web ngoài nếu muốn thay ảnh mới.
    */
-  const handleSaveBannerImgUrl = async (banner: ImageBannerItem) => {
-    const cleanInput = tempBannerImgUrl.trim();
-    if (!cleanInput) return;
-
-    const isLocalRename =
-      cleanInput.startsWith(origin) ||
-      cleanInput.includes('localhost:') ||
-      cleanInput.startsWith('/uploads/') ||
-      cleanInput.startsWith('uploads/') ||
-      cleanInput.startsWith('/image/') ||
-      cleanInput.startsWith('image/') ||
-      !/^https?:\/\//i.test(cleanInput);
-
-    if (isLocalRename) {
-      try {
-        setProcessingBannerId(banner.id);
-        const renameRes = await fetch('/api/rename-banner-link', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            currentImageUrl: banner.imageUrl,
-            currentOriginalUrl: banner.originalImageUrl || banner.imageUrl,
-            newName: cleanInput
-          })
-        }).then(r => r.json());
-
-        if (!renameRes.success) throw new Error(renameRes.error || 'Lỗi đổi tên link');
-
-        const fullPayload: Partial<ImageBannerItem> = {
-          title: banner.title,
-          slug: renameRes.newSlug,
-          imageUrl: renameRes.newImageUrl,
-          originalImageUrl: banner.originalImageUrl || banner.imageUrl,
-          aspectRatio: cardRatios[banner.id] ?? (banner.aspectRatio || '16:9'),
-          fitMode: cardFitModes[banner.id] ?? (banner.fitMode || 'fit'),
-          bgColor: cardBgColors[banner.id] ?? (banner.bgColor || '#ffffff')
-        };
-
-        await updateBannerInFirestore(banner.id, fullPayload);
-        await api.updateImage(banner.id, fullPayload).catch(() => {});
-        setEditingBannerImgId(null);
-        notify(`Đã đổi link thành /uploads/${renameRes.newSlug} & /image/${renameRes.newSlug}`);
-      } catch (err: any) {
-        notify('Lỗi: ' + (err.message || 'Không thể đổi link'));
-      } finally {
-        setProcessingBannerId(null);
-      }
+  const handleSaveBannerInlineLink = async (banner: ImageBannerItem) => {
+    const cleanSlug = extractCleanSlug(tempBannerSlugInline || banner.slug);
+    if (!cleanSlug) {
+      notify('Mã đường dẫn (slug) không hợp lệ');
       return;
     }
 
-    // Nếu là URL ảnh từ trang web bên ngoài
-    await handleSaveBannerTransform(banner, cleanInput);
-    setEditingBannerImgId(null);
+    const conflict = banners.find(b => b.id !== banner.id && b.slug.toLowerCase() === cleanSlug);
+    if (conflict) {
+      notify(`Đường dẫn /image/${cleanSlug} đã được dùng cho banner khác!`);
+      return;
+    }
+
+    const rawImgInput = tempBannerImgUrl.trim();
+    const isExternalNewImage =
+      rawImgInput &&
+      /^https?:\/\//i.test(rawImgInput) &&
+      !rawImgInput.startsWith(origin) &&
+      !rawImgInput.includes('localhost:') &&
+      rawImgInput !== banner.imageUrl &&
+      rawImgInput !== banner.originalImageUrl;
+
+    if (isExternalNewImage) {
+      await handleSaveBannerTransform(banner, rawImgInput, cleanSlug);
+      setEditingBannerImgId(null);
+      return;
+    }
+
+    // Nếu người dùng đổi tên đường dẫn nội bộ (VD: /uploads/123 -> /uploads/12345 hoặc /image/123 -> /image/12345)
+    try {
+      setProcessingBannerId(banner.id);
+      const fullPayload: Partial<ImageBannerItem> = {
+        title: banner.title,
+        slug: cleanSlug,
+        imageUrl: banner.imageUrl,
+        originalImageUrl: banner.originalImageUrl || banner.imageUrl,
+        aspectRatio: cardRatios[banner.id] ?? (banner.aspectRatio || '16:9'),
+        fitMode: cardFitModes[banner.id] ?? (banner.fitMode || 'fit'),
+        bgColor: cardBgColors[banner.id] ?? (banner.bgColor || '#ffffff'),
+        rotation: cardRotations[banner.id] ?? (banner.rotation || 0),
+        flipH: cardFlipH[banner.id] ?? !!banner.flipH,
+        flipV: cardFlipV[banner.id] ?? !!banner.flipV,
+        offsetY: cardOffsetY[banner.id] ?? (banner.offsetY || 0),
+        scale: cardScale[banner.id] ?? (banner.scale ?? 1.0),
+        opacity: cardOpacity[banner.id] ?? (banner.opacity ?? 1.0),
+        dimensions: banner.dimensions || '1200x675'
+      };
+
+      await updateBannerInFirestore(banner.id, fullPayload);
+      await api.updateImage(banner.id, fullPayload).catch(() => {});
+      if (cleanSlug !== banner.slug) {
+        await api.createImage({
+          title: banner.title,
+          slug: cleanSlug,
+          imageUrl: banner.imageUrl,
+          dimensions: banner.dimensions
+        }).catch(() => {});
+      }
+
+      setEditingBannerImgId(null);
+      notify(`Đã đổi đường dẫn thành /image/${cleanSlug}`);
+    } catch (err: any) {
+      notify('Lỗi: ' + (err.message || 'Không thể đổi đường dẫn'));
+    } finally {
+      setProcessingBannerId(null);
+    }
   };
 
   const confirmDelete = async () => {
@@ -1601,7 +1661,7 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 1: LINKS */}
+        {/* TAB 1: LINKS (Cho phép sửa trực tiếp Tên, /link/123 -> /link/12345 và Link đích) */}
         {activeTab === 'links' && (
           <div className="space-y-3">
             {showCreateLink && (
@@ -1618,7 +1678,7 @@ export default function App() {
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-500 font-medium mb-1">Slug *</label>
+                    <label className="block text-slate-500 font-medium mb-1">Đường dẫn rút gọn (Slug) *</label>
                     <div className="flex items-center">
                       <span className="bg-slate-100 border border-r-0 border-slate-200 rounded-l-xl px-2.5 py-2 text-slate-500 font-mono text-[11px]">
                         /link/
@@ -1626,8 +1686,8 @@ export default function App() {
                       <input
                         type="text"
                         value={newLinkSlug}
-                        onChange={e => setNewLinkSlug(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '-'))}
-                        placeholder="ytb"
+                        onChange={e => setNewLinkSlug(e.target.value)}
+                        placeholder="123"
                         required
                         className="flex-1 bg-slate-50 border border-slate-200 rounded-r-xl px-2.5 py-2 text-slate-900 font-mono font-semibold focus:bg-white focus:outline-none focus:border-slate-400"
                       />
@@ -1669,31 +1729,45 @@ export default function App() {
               </div>
             ) : (
               filteredLinks.map(link => {
-                const shortUrl = `${origin}/link/${link.slug}`;
+                const currentTitle = editingLinkTitle[link.id] !== undefined ? editingLinkTitle[link.id] : link.title;
+                const currentSlug = editingLinkSlug[link.id] !== undefined ? editingLinkSlug[link.id] : link.slug;
                 const currentDest = editingDest[link.id] !== undefined ? editingDest[link.id] : link.destinationUrl;
-                const hasChanged = currentDest.trim() !== link.destinationUrl.trim();
+
+                const shortUrl = `${origin}/link/${link.slug}`;
+                const hasChanged =
+                  currentTitle.trim() !== link.title.trim() ||
+                  extractCleanSlug(currentSlug) !== link.slug.trim() ||
+                  currentDest.trim() !== link.destinationUrl.trim();
 
                 return (
                   <div
                     key={link.id}
-                    className="p-4 rounded-2xl bg-white border border-slate-200/90 hover:border-slate-300 transition shadow-2xs space-y-2.5"
+                    className="p-4 rounded-2xl bg-white border border-slate-200/90 hover:border-slate-300 transition shadow-2xs space-y-3"
                   >
+                    {/* Dòng trên: Tên link + Thống kê click + Các nút thao tác */}
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900 text-sm">{link.title}</span>
-                        <span className="text-[11px] text-slate-500 font-mono bg-slate-100 px-2 py-0.5 rounded-md">
+                      <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+                        <input
+                          type="text"
+                          value={currentTitle}
+                          onChange={e => setEditingLinkTitle(prev => ({ ...prev, [link.id]: e.target.value }))}
+                          placeholder="Tên gợi nhớ..."
+                          className="font-bold text-slate-900 text-sm bg-transparent border-b border-transparent hover:border-slate-200 focus:border-slate-400 focus:outline-none px-1 py-0.5 transition"
+                          title="Bấm để sửa tên"
+                        />
+                        <span className="text-[11px] text-slate-500 font-mono bg-slate-100 px-2 py-0.5 rounded-md shrink-0">
                           {link.totalClicks || 0} clicks
                         </span>
                       </div>
 
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono text-xs font-semibold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
-                          /link/{link.slug}
+                          {shortUrl}
                         </span>
                         <button
                           onClick={() => handleCopy(shortUrl)}
                           className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
-                          title="Sao chép link"
+                          title="Sao chép link rút gọn"
                         >
                           {copiedText === shortUrl ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                         </button>
@@ -1723,25 +1797,50 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={currentDest}
-                        onChange={e => setEditingDest(prev => ({ ...prev, [link.id]: e.target.value }))}
-                        placeholder="https://..."
-                        className="flex-1 bg-slate-50 border border-slate-200 focus:bg-white focus:border-slate-400 rounded-xl px-3 py-1.5 text-xs text-slate-800 font-mono focus:outline-none transition"
-                      />
-                      <button
-                        onClick={() => handleSaveDestination(link)}
-                        disabled={savingDestId === link.id}
-                        className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition ${
-                          hasChanged
-                            ? 'bg-slate-900 hover:bg-slate-800 text-white'
-                            : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                        }`}
-                      >
-                        {savingDestId === link.id ? '...' : 'Lưu'}
-                      </button>
+                    {/* Dòng dưới: Sửa trực tiếp đường dẫn /link/123 -> /link/12345 VÀ Link đích */}
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                      {/* Ô sửa đường dẫn /link/slug */}
+                      <div className="sm:col-span-4 flex items-center">
+                        <span className="bg-slate-100 border border-r-0 border-slate-200 rounded-l-xl px-2.5 py-1.5 text-slate-500 font-mono text-xs select-none">
+                          /link/
+                        </span>
+                        <input
+                          type="text"
+                          value={currentSlug}
+                          onChange={e => setEditingLinkSlug(prev => ({ ...prev, [link.id]: e.target.value }))}
+                          placeholder="12345"
+                          className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-slate-400 rounded-r-xl px-2.5 py-1.5 text-xs text-slate-900 font-mono font-bold focus:outline-none transition"
+                          title="Sửa mã đường dẫn (VD: đổi 123 thành 12345)"
+                        />
+                      </div>
+
+                      {/* Ô sửa Link đích */}
+                      <div className="sm:col-span-6 flex items-center">
+                        <input
+                          type="text"
+                          value={currentDest}
+                          onChange={e => setEditingDest(prev => ({ ...prev, [link.id]: e.target.value }))}
+                          placeholder="https://..."
+                          className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-slate-400 rounded-xl px-3 py-1.5 text-xs text-slate-800 font-mono focus:outline-none transition"
+                          title="Sửa trang đích chuyển hướng tới"
+                        />
+                      </div>
+
+                      {/* Nút Lưu */}
+                      <div className="sm:col-span-2 flex justify-end">
+                        <button
+                          onClick={() => handleSaveLinkChanges(link)}
+                          disabled={savingDestId === link.id}
+                          className={`w-full px-3.5 py-1.5 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1 ${
+                            hasChanged
+                              ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-2xs'
+                              : 'bg-slate-900 hover:bg-slate-800 text-white'
+                          }`}
+                        >
+                          <Save className="w-3.5 h-3.5" />
+                          <span>{savingDestId === link.id ? '...' : hasChanged ? 'Lưu *' : 'Lưu'}</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -1767,7 +1866,6 @@ export default function App() {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-                  {/* Cột trái: Thiết lập thông số */}
                   <div className="lg:col-span-7 space-y-3.5">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
@@ -1789,7 +1887,7 @@ export default function App() {
                           <input
                             type="text"
                             value={newBannerSlug}
-                            onChange={e => setNewBannerSlug(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '-'))}
+                            onChange={e => setNewBannerSlug(e.target.value)}
                             placeholder="banner1"
                             required
                             className="flex-1 bg-slate-50 border border-slate-200 rounded-r-xl px-2.5 py-2 text-slate-900 font-mono font-semibold focus:bg-white focus:outline-none focus:border-slate-400"
@@ -1950,7 +2048,6 @@ export default function App() {
                       )}
                     </div>
 
-                    {/* Các thanh kéo */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                       <ModernSlider
                         icon={<ZoomIn className="w-3.5 h-3.5 text-slate-500" />}
@@ -1999,7 +2096,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Cột phải: Khung Preview 1:1 chuẩn như trên web */}
+                  {/* Cột phải: Khung Preview 1:1 */}
                   <div className="lg:col-span-5 flex flex-col justify-between space-y-3">
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
@@ -2239,7 +2336,7 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Bảng Công cụ: Thanh trượt Zoom, Mờ, Lên/Xuống, Trái/Phải, Xoay, Gương */}
+                      {/* Bảng Công cụ */}
                       {isToolsOpen && (
                         <div className="p-3 bg-slate-50 border-b border-slate-100 space-y-2.5 text-xs">
                           <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -2328,7 +2425,7 @@ export default function App() {
                         </div>
                       )}
 
-                      {/* Bảng chọn Có nền / Không nền (Trong suốt) */}
+                      {/* Bảng chọn Có nền / Không nền */}
                       {isColorOpen && (
                         <div className="px-3.5 py-2.5 bg-white border-b border-slate-100 space-y-2 text-xs">
                           <div className="flex items-center justify-between gap-2">
@@ -2402,7 +2499,7 @@ export default function App() {
                         </div>
                       )}
 
-                      {/* KHUNG PREVIEW TỈ LỆ 1:1 — HIỂN THỊ ĐÚNG TỈ LỆ & NỀN CỦA CẢ ẢNH TĨNH LẪN ẢNH GIF */}
+                      {/* KHUNG PREVIEW TỈ LỆ 1:1 */}
                       <SquareStagePreview
                         srcUrl={banner.originalImageUrl || banner.imageUrl}
                         ratioId={currentRatioId}
@@ -2419,33 +2516,54 @@ export default function App() {
                         onClick={() => setCinemaReviewBanner(banner)}
                       />
 
-                      {/* Khung Đổi Link (Cho phép đổi tên link /uploads/123 -> /uploads/12345 hoặc dán URL mới) */}
+                      {/* Hộp thoại Đổi Link (/image/123 -> /image/12345) và Nguồn ảnh */}
                       {isEditingImgUrl && (
-                        <div className="p-3 bg-slate-50 border-b border-slate-100 space-y-2 text-xs">
-                          <div className="text-[11px] text-slate-600 font-medium">
-                            Nhập tên đường dẫn mới (VD: <code className="font-mono text-slate-900">12345</code> hoặc <code className="font-mono text-slate-900">{origin}/uploads/12345</code>) hoặc dán URL ảnh ngoài:
+                        <div className="p-3 bg-slate-50 border-b border-slate-100 space-y-2.5 text-xs">
+                          <div>
+                            <label className="block text-[11px] text-slate-600 font-semibold mb-1">
+                              1. Đổi đường dẫn truy cập ảnh (VD: đổi <code className="font-mono">{banner.slug}</code> thành <code className="font-mono">12345</code>):
+                            </label>
+                            <div className="flex items-center">
+                              <span className="bg-slate-200/80 border border-r-0 border-slate-300 rounded-l-lg px-2.5 py-1.5 text-slate-600 font-mono text-[11px]">
+                                {origin}/image/
+                              </span>
+                              <input
+                                type="text"
+                                value={tempBannerSlugInline}
+                                onChange={e => setTempBannerSlugInline(e.target.value)}
+                                placeholder="12345"
+                                className="flex-1 bg-white border border-slate-300 rounded-r-lg px-2.5 py-1.5 text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-slate-500"
+                              />
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1.5">
+
+                          <div>
+                            <label className="block text-[11px] text-slate-500 font-medium mb-1">
+                              2. Hoặc dán URL ảnh mới từ web ngoài (Để nguyên nếu chỉ muốn đổi đường dẫn trên):
+                            </label>
                             <input
                               type="text"
                               value={tempBannerImgUrl}
                               onChange={e => setTempBannerImgUrl(e.target.value)}
-                              placeholder={`${origin}/uploads/${banner.slug}`}
-                              className="flex-1 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 font-mono focus:outline-none focus:border-slate-400"
+                              placeholder="https://..."
+                              className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 font-mono focus:outline-none focus:border-slate-400"
                             />
-                            <button
-                              type="button"
-                              onClick={() => handleSaveBannerImgUrl(banner)}
-                              className="px-3 py-1.5 rounded-lg bg-slate-900 text-white font-semibold text-xs hover:bg-slate-800"
-                            >
-                              Lưu Link
-                            </button>
+                          </div>
+
+                          <div className="flex items-center justify-end gap-1.5 pt-1">
                             <button
                               type="button"
                               onClick={() => setEditingBannerImgId(null)}
-                              className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 text-xs hover:bg-slate-100"
+                              className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 text-xs hover:bg-slate-100"
                             >
                               Hủy
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSaveBannerInlineLink(banner)}
+                              className="px-3.5 py-1.5 rounded-lg bg-slate-900 text-white font-semibold text-xs hover:bg-slate-800"
+                            >
+                              Lưu Đường Dẫn
                             </button>
                           </div>
                         </div>
@@ -2494,10 +2612,11 @@ export default function App() {
                             type="button"
                             onClick={() => {
                               setEditingBannerImgId(isEditingImgUrl ? null : banner.id);
-                              setTempBannerImgUrl(`${origin}${banner.imageUrl.startsWith('/') ? banner.imageUrl : '/' + banner.imageUrl}`);
+                              setTempBannerSlugInline(banner.slug);
+                              setTempBannerImgUrl(banner.originalImageUrl || banner.imageUrl);
                             }}
                             className="px-2 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-[11px] flex items-center gap-1 transition"
-                            title="Đổi tên đường dẫn /uploads/... hoặc thay URL ảnh"
+                            title="Đổi đường dẫn /image/123 -> /image/12345 hoặc thay URL ảnh"
                           >
                             <Edit2 className="w-3 h-3" />
                             <span>Đổi link</span>

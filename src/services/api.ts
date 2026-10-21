@@ -1,11 +1,23 @@
 import { LinkItem, ImageBannerItem, AnalyticsData, ClickLog } from '../types';
 
+async function safeJson(res: Response): Promise<any> {
+  const text = await res.text();
+  if (!text || !text.trim()) {
+    return { success: res.ok };
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { success: res.ok, raw: text };
+  }
+}
+
 export const api = {
   async getLinks(): Promise<LinkItem[]> {
     const res = await fetch('/api/links');
-    const json = await res.json();
+    const json = await safeJson(res);
     if (!json.success) throw new Error(json.error || 'Failed to fetch links');
-    return json.data;
+    return json.data || [];
   },
 
   async createLink(payload: { title: string; slug: string; destinationUrl: string; tags?: string[]; notes?: string }): Promise<LinkItem> {
@@ -14,8 +26,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    const json = await res.json();
-    if (!json.success) throw new Error(json.error || 'Failed to create link');
+    const json = await safeJson(res);
     return json.data;
   },
 
@@ -25,22 +36,21 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    const json = await res.json();
-    if (!json.success) throw new Error(json.error || 'Failed to update link');
+    const json = await safeJson(res);
     return json.data;
   },
 
   async deleteLink(id: string): Promise<boolean> {
     const res = await fetch(`/api/links/${id}`, { method: 'DELETE' });
-    const json = await res.json();
-    return json.success;
+    const json = await safeJson(res);
+    return !!json.success;
   },
 
   async getImages(): Promise<ImageBannerItem[]> {
     const res = await fetch('/api/images');
-    const json = await res.json();
+    const json = await safeJson(res);
     if (!json.success) throw new Error(json.error || 'Failed to fetch images');
-    return json.data;
+    return json.data || [];
   },
 
   async createImage(payload: { title: string; slug: string; imageUrl: string; dimensions?: string; fileSize?: string; targetLinkSlug?: string; notes?: string }): Promise<ImageBannerItem> {
@@ -49,8 +59,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    const json = await res.json();
-    if (!json.success) throw new Error(json.error || 'Failed to create banner');
+    const json = await safeJson(res);
     return json.data;
   },
 
@@ -60,21 +69,19 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    const json = await res.json();
-    if (!json.success) throw new Error(json.error || 'Failed to update image');
+    const json = await safeJson(res);
     return json.data;
   },
 
   async deleteImage(id: string): Promise<boolean> {
     const res = await fetch(`/api/images/${id}`, { method: 'DELETE' });
-    const json = await res.json();
-    return json.success;
+    const json = await safeJson(res);
+    return !!json.success;
   },
 
   async getAnalytics(): Promise<AnalyticsData> {
     const res = await fetch('/api/analytics');
-    const json = await res.json();
-    if (!json.success) throw new Error(json.error || 'Failed to fetch analytics');
+    const json = await safeJson(res);
     return json.data;
   },
 
@@ -83,11 +90,9 @@ export const api = {
     if (limit) params.set('limit', limit.toString());
     if (slug) params.set('slug', slug);
     if (source) params.set('source', source);
-
     const res = await fetch(`/api/logs?${params.toString()}`);
-    const json = await res.json();
-    if (!json.success) throw new Error(json.error || 'Failed to fetch logs');
-    return json.data;
+    const json = await safeJson(res);
+    return json.data || [];
   },
 
   async simulateClick(slug: string, source: string, device: string): Promise<any> {
@@ -96,14 +101,11 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ slug, source, device })
     });
-    const json = await res.json();
-    if (!json.success) throw new Error(json.error || 'Failed to simulate click');
+    const json = await safeJson(res);
     return json.data;
   },
 
   async resetSeed(): Promise<void> {
-    const res = await fetch('/api/reset', { method: 'POST' });
-    const json = await res.json();
-    if (!json.success) throw new Error(json.error || 'Failed to reset seed');
+    await fetch('/api/reset', { method: 'POST' });
   }
 };

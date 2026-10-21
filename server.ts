@@ -47,6 +47,11 @@ if (fs.existsSync(firebaseConfigFile)) {
         const data = { id: change.doc.id, ...change.doc.data() } as any;
         const slug = data.slug?.toLowerCase();
         if (!slug) return;
+        for (const [k, v] of liveLinks.entries()) {
+          if (v.id === data.id && k !== slug) {
+            liveLinks.delete(k);
+          }
+        }
         if (change.type === 'removed') {
           liveLinks.delete(slug);
         } else {
@@ -60,6 +65,11 @@ if (fs.existsSync(firebaseConfigFile)) {
         const data = { id: change.doc.id, ...change.doc.data() } as any;
         const slug = data.slug?.toLowerCase();
         if (!slug) return;
+        for (const [k, v] of liveImages.entries()) {
+          if (v.id === data.id && k !== slug) {
+            liveImages.delete(k);
+          }
+        }
         if (change.type === 'removed') {
           liveImages.delete(slug);
         } else {
@@ -67,7 +77,6 @@ if (fs.existsSync(firebaseConfigFile)) {
         }
       });
     });
-
     console.log('[ADS93] Connected to real Firestore database successfully.');
   } catch (err) {
     console.error('[ADS93] Failed to initialize backend Firestore:', err);
